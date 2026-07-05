@@ -231,12 +231,12 @@ class BlinkitClient(PlatformClient):
 
                     url = f"https://blinkit.com/prn/product/prid/{product_id}"
                     try:
-                        await page.goto(url, wait_until="domcontentloaded", timeout=45000)
+                        await page.goto(url, wait_until="domcontentloaded", timeout=60000)
                         
                         # Wait dynamically for the XHR response instead of hardcoded sleep
                         import time
                         start_wait = time.time()
-                        while product_json is None and (time.time() - start_wait < 15.0):
+                        while product_json is None and (time.time() - start_wait < 25.0):
                             await asyncio.sleep(0.1)
                             
                     except Exception as e:

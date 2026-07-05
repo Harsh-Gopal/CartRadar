@@ -113,6 +113,7 @@ class BigBasketClient(PlatformClient):
 
         self._client = httpx.AsyncClient(**kwargs)
         self._sem = asyncio.Semaphore(concurrency)
+        self._session_initialized = False
 
         if self.__class__._geo_lock is None:
             self.__class__._geo_lock = asyncio.Lock()
@@ -198,6 +199,13 @@ class BigBasketClient(PlatformClient):
     # ── HTTP helpers ──────────────────────────────────────────────────────────
 
     async def _request(self, method: str, url: str, **kwargs) -> httpx.Response:
+        if not self._session_initialized:
+            self._session_initialized = True
+            try:
+                await self._client.get(WEB_BASE + "/", headers={"Accept": "text/html"})
+            except Exception as e:
+                log.warning("BB session init failed: %s", e)
+                
         last: httpx.Response | None = None
         for attempt in range(3):
             async with self._sem:
@@ -247,11 +255,9 @@ class BigBasketClient(PlatformClient):
             f"{lat}|{lng}|{area}|{pincode}|{city}".encode()
         ).decode().rstrip("=")
         
-        cookies = {
-            "_bb_lat_long": lat_long_b64,
-            "_bb_addressinfo": addr_b64,
-            "_bb_pin_code": pincode,
-        }
+        self._client.cookies.set("_bb_lat_long", lat_long_b64, domain=".bigbasket.com")
+        self._client.cookies.set("_bb_addressinfo", addr_b64, domain=".bigbasket.com")
+        self._client.cookies.set("_bb_pin_code", pincode, domain=".bigbasket.com")
 
         url = f"{WEB_BASE}/pd/{product_id}/"
         try:
@@ -259,7 +265,6 @@ class BigBasketClient(PlatformClient):
                 "GET",
                 url,
                 headers={**_HEADERS, "Referer": WEB_BASE + "/"},
-                cookies=cookies,
             )
             if resp.status_code == 200:
                 return resp.text
