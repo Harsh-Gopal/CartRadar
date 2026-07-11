@@ -158,7 +158,8 @@ class BigBasketClient(PlatformClient):
                     min_dist = dist
                     closest = data
             
-            if closest and min_dist <= 40:
+            # Only reuse cached geocode if within 5km (same pincode area)
+            if closest and min_dist <= 5.0:
                 return closest
 
             # Not found or too far, fetch exact coordinates from Nominatim

@@ -20,15 +20,21 @@ echo "==> Frontend deps"
 
 # DEV_MODE lifts all rate limits / search & probe budgets / radius cap locally.
 # ENABLED_PLATFORMS enables all implemented platforms.
-(cd backend && DEV_MODE=1 ENABLED_PLATFORMS=zepto,swiggy,bigbasket uv run uvicorn app.main:app --port 8400 --reload) &
+(cd backend && DEV_MODE=1 ENABLED_PLATFORMS=zepto,swiggy,bigbasket,blinkit uv run python -m uvicorn app.main:app --port 8000 --reload) &
+
+echo "Waiting for backend to start on port 8000..."
+while ! nc -z localhost 8000; do   
+  sleep 0.5
+done
+
 (cd frontend && pnpm dev) &
 
 sleep 2
 echo ""
 echo "================================================"
-echo "  Mega Finder"
+echo "  Cart Radar"
 echo "  Open:  http://localhost:5173"
-echo "  API:   http://localhost:8400/api/stats"
+echo "  API:   http://localhost:8000/api/stats"
 echo "================================================"
 echo ""
 wait

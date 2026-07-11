@@ -49,73 +49,74 @@
 }
 
 :root {
-    /* Modern neutral theme – clean slate base with a refined violet accent */
-    --background: oklch(0.99 0.002 240);
-    --foreground: oklch(0.18 0.015 250);
+    /* Cart Radar — Indigo/violet primary with radar-blue accent */
+    --background: oklch(0.985 0.003 255);
+    --foreground: oklch(0.16 0.018 260);
     --card: oklch(1 0 0);
-    --card-foreground: oklch(0.18 0.015 250);
+    --card-foreground: oklch(0.16 0.018 260);
     --popover: oklch(1 0 0);
-    --popover-foreground: oklch(0.18 0.015 250);
-    --primary: oklch(0.50 0.24 295);
+    --popover-foreground: oklch(0.16 0.018 260);
+    --primary: oklch(0.52 0.26 265);       /* vibrant indigo */
     --primary-foreground: oklch(0.99 0 0);
-    --secondary: oklch(0.962 0.008 250);
-    --secondary-foreground: oklch(0.32 0.04 260);
-    --muted: oklch(0.960 0.006 250);
-    --muted-foreground: oklch(0.52 0.018 255);
-    --accent: oklch(0.950 0.012 260);
-    --accent-foreground: oklch(0.32 0.04 260);
+    --secondary: oklch(0.958 0.010 255);
+    --secondary-foreground: oklch(0.30 0.04 265);
+    --muted: oklch(0.955 0.008 255);
+    --muted-foreground: oklch(0.50 0.02 258);
+    --accent: oklch(0.946 0.015 265);
+    --accent-foreground: oklch(0.30 0.04 265);
     --destructive: oklch(0.577 0.245 27.325);
-    --border: oklch(0.910 0.010 250);
-    --input: oklch(0.910 0.010 250);
-    --ring: oklch(0.50 0.24 295);
-    --chart-1: oklch(0.50 0.24 295);
-    --chart-2: oklch(0.60 0.21 320);
-    --chart-3: oklch(0.64 0.2 12);
-    --chart-4: oklch(0.70 0.16 60);
-    --chart-5: oklch(0.60 0.13 250);
+    --border: oklch(0.905 0.012 255);
+    --input: oklch(0.905 0.012 255);
+    --ring: oklch(0.52 0.26 265);
+    --chart-1: oklch(0.52 0.26 265);
+    --chart-2: oklch(0.60 0.22 310);
+    --chart-3: oklch(0.64 0.2 15);
+    --chart-4: oklch(0.70 0.16 65);
+    --chart-5: oklch(0.60 0.14 200);
     --radius: 0.75rem;
-    --sidebar: oklch(0.982 0.004 250);
-    --sidebar-foreground: oklch(0.18 0.015 250);
-    --sidebar-primary: oklch(0.50 0.24 295);
+    --sidebar: oklch(0.978 0.005 255);
+    --sidebar-foreground: oklch(0.16 0.018 260);
+    --sidebar-primary: oklch(0.52 0.26 265);
     --sidebar-primary-foreground: oklch(0.99 0 0);
-    --sidebar-accent: oklch(0.950 0.012 260);
-    --sidebar-accent-foreground: oklch(0.32 0.04 260);
-    --sidebar-border: oklch(0.910 0.010 250);
-    --sidebar-ring: oklch(0.50 0.24 295);
+    --sidebar-accent: oklch(0.946 0.015 265);
+    --sidebar-accent-foreground: oklch(0.30 0.04 265);
+    --sidebar-border: oklch(0.905 0.012 255);
+    --sidebar-ring: oklch(0.52 0.26 265);
 }
 
 .dark {
-    --background: oklch(0.148 0.004 228.8);
-    --foreground: oklch(0.987 0.002 197.1);
-    --card: oklch(0.218 0.008 223.9);
-    --card-foreground: oklch(0.987 0.002 197.1);
-    --popover: oklch(0.218 0.008 223.9);
-    --popover-foreground: oklch(0.987 0.002 197.1);
-    --primary: oklch(0.62 0.22 296);
+    /* Dark mode: deep space navy with bright indigo highlights */
+    --background: oklch(0.130 0.018 265);
+    --foreground: oklch(0.955 0.006 220);
+    --card: oklch(0.175 0.018 260);
+    --card-foreground: oklch(0.955 0.006 220);
+    --popover: oklch(0.175 0.018 260);
+    --popover-foreground: oklch(0.955 0.006 220);
+    --primary: oklch(0.65 0.24 265);
     --primary-foreground: oklch(0.99 0 0);
-    --secondary: oklch(0.275 0.011 216.9);
-    --secondary-foreground: oklch(0.987 0.002 197.1);
-    --muted: oklch(0.275 0.011 216.9);
-    --muted-foreground: oklch(0.723 0.014 214.4);
-    --accent: oklch(0.275 0.011 216.9);
-    --accent-foreground: oklch(0.987 0.002 197.1);
-    --destructive: oklch(0.704 0.191 22.216);
+    --secondary: oklch(0.220 0.018 260);
+    --secondary-foreground: oklch(0.955 0.006 220);
+    --muted: oklch(0.220 0.018 260);
+    --muted-foreground: oklch(0.65 0.015 255);
+    --accent: oklch(0.220 0.018 260);
+    --accent-foreground: oklch(0.955 0.006 220);
+    --destructive: oklch(0.65 0.22 25);
     --border: oklch(1 0 0 / 10%);
-    --input: oklch(1 0 0 / 15%);
-    --ring: oklch(0.62 0.22 296);
-    --chart-1: oklch(0.62 0.22 296);
-    --chart-2: oklch(0.66 0.2 320);
-    --chart-3: oklch(0.68 0.19 12);
-    --chart-4: oklch(0.72 0.16 60);
-    --chart-5: oklch(0.64 0.14 250);
-    --sidebar: oklch(0.218 0.008 223.9);
-    --sidebar-foreground: oklch(0.987 0.002 197.1);
-    --sidebar-primary: oklch(0.62 0.22 296);
+    --input: oklch(1 0 0 / 12%);
+    --ring: oklch(0.65 0.24 265);
+    --chart-1: oklch(0.65 0.24 265);
+    --chart-2: oklch(0.68 0.21 310);
+    --chart-3: oklch(0.70 0.20 15);
+    --chart-4: oklch(0.74 0.16 65);
+    --chart-5: oklch(0.65 0.15 200);
+    --sidebar: oklch(0.175 0.018 260);
+    --sidebar-foreground: oklch(0.955 0.006 220);
+    --sidebar-primary: oklch(0.65 0.24 265);
     --sidebar-primary-foreground: oklch(0.99 0 0);
-    --sidebar-accent: oklch(0.275 0.011 216.9);
-    --sidebar-accent-foreground: oklch(0.987 0.002 197.1);
+    --sidebar-accent: oklch(0.220 0.018 260);
+    --sidebar-accent-foreground: oklch(0.955 0.006 220);
     --sidebar-border: oklch(1 0 0 / 10%);
-    --sidebar-ring: oklch(0.56 0.021 213.5);
+    --sidebar-ring: oklch(0.65 0.24 265);
 }
 
 @layer base {
@@ -124,25 +125,24 @@
   }
   body {
     @apply bg-background text-foreground;
-    /* Soft, modern background */
     background-image: 
-      radial-gradient(at 0% 0%, hsla(253,16%,7%,0.03) 0, transparent 50%), 
-      radial-gradient(at 50% 0%, hsla(225,39%,30%,0.03) 0, transparent 50%), 
-      radial-gradient(at 100% 0%, hsla(339,49%,30%,0.03) 0, transparent 50%);
+      radial-gradient(ellipse at 20% 0%, oklch(0.52 0.26 265 / 0.04) 0, transparent 60%), 
+      radial-gradient(ellipse at 80% 0%, oklch(0.60 0.22 310 / 0.03) 0, transparent 60%),
+      radial-gradient(ellipse at 50% 100%, oklch(0.52 0.26 265 / 0.02) 0, transparent 60%);
     background-attachment: fixed;
   }
   .dark body {
     background-image: 
-      radial-gradient(at 0% 0%, hsla(253,16%,70%,0.05) 0, transparent 50%), 
-      radial-gradient(at 50% 0%, hsla(225,39%,80%,0.05) 0, transparent 50%), 
-      radial-gradient(at 100% 0%, hsla(339,49%,80%,0.05) 0, transparent 50%);
+      radial-gradient(ellipse at 20% 0%, oklch(0.65 0.24 265 / 0.08) 0, transparent 60%), 
+      radial-gradient(ellipse at 80% 0%, oklch(0.68 0.21 310 / 0.06) 0, transparent 60%),
+      radial-gradient(ellipse at 50% 100%, oklch(0.65 0.24 265 / 0.04) 0, transparent 60%);
   }
   html {
     @apply font-sans;
     -webkit-tap-highlight-color: transparent;
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
-    }
+  }
   button,
   [role="button"],
   [role="option"],
@@ -153,11 +153,30 @@
   label,
   a {
     touch-action: manipulation;
-    }
+  }
 }
 
-/* Leaflet, themed to match the app. Double class beats leaflet.css ordering;
-   .dark selectors win on specificity. */
+/* ── Radar logo animation ─────────────────────────────────────────────────── */
+@keyframes radar-sweep {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+@keyframes radar-ping {
+  0%, 100% { opacity: 0.6; transform: scale(1); }
+  50%       { opacity: 0.15; transform: scale(1.6); }
+}
+
+.radar-sweep {
+  transform-origin: 12px 12px;
+  animation: radar-sweep 3s linear infinite;
+}
+
+.radar-ping {
+  animation: radar-ping 2s ease-in-out infinite;
+}
+
+/* ── Map theming ─────────────────────────────────────────────────────────── */
 .leaflet-container.leaflet-container {
   background-color: var(--muted);
   font-family: inherit;
@@ -186,4 +205,34 @@
 }
 .dark .leaflet-control-attribution a {
   color: var(--foreground);
+}
+
+/* ── Glassmorphism card utility ──────────────────────────────────────────── */
+.glass-card {
+  background: oklch(from var(--card) l c h / 0.75);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border);
+}
+.dark .glass-card {
+  background: oklch(from var(--card) l c h / 0.60);
+}
+
+/* ── Status badge colors ─────────────────────────────────────────────────── */
+.badge-in-stock {
+  background: oklch(0.92 0.12 145);
+  color: oklch(0.30 0.12 145);
+  border: none;
+}
+.dark .badge-in-stock {
+  background: oklch(0.28 0.10 145);
+  color: oklch(0.78 0.15 145);
+}
+.badge-unavailable {
+  background: oklch(0.94 0.04 265);
+  color: oklch(0.45 0.06 265);
+}
+.dark .badge-unavailable {
+  background: oklch(0.24 0.04 265);
+  color: oklch(0.70 0.06 265);
 }

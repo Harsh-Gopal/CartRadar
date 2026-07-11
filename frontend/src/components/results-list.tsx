@@ -20,7 +20,7 @@ export const STATUS_LABEL: Record<StoreResult["status"], string> = {
   in_stock: "In stock",
   out_of_stock: "Out of stock",
   not_carried: "Limited Distribution",
-  error: "Check failed",
+  error: "Unavailable",
 }
 
 export const STATUS_VARIANT: Record<
@@ -30,12 +30,11 @@ export const STATUS_VARIANT: Record<
   in_stock: "default",
   out_of_stock: "secondary",
   not_carried: "outline",
-  error: "destructive",
+  error: "outline",  // Changed from destructive to outline (less alarming)
 }
 
 export function prettyStoreName(name: string | null): string {
-  // Store names come prefixed with an internal city code, e.g. "BLR-HSR Layout New".
-  return (name ?? "Zepto store").replace(/^[A-Z]{2,5}[- ]\s*/, "")
+  return (name ?? "Store").replace(/^[A-Z]{2,5}[- ]\s*/, "")
 }
 
 export function formatPrice(price: number): string {
@@ -45,6 +44,7 @@ export function formatPrice(price: number): string {
 export function getPlatformFromId(id: string): string {
   if (id.startsWith("bb_") || id.startsWith("bb-")) return "bigbasket"
   if (id.startsWith("blinkit_")) return "blinkit"
+  if (id.startsWith("swiggy_")) return "swiggy"
   if (/^\d+$/.test(id)) return "swiggy"
   return "zepto"
 }
@@ -57,9 +57,21 @@ interface ResultsListProps {
   onSelect: (result: StoreResult) => void
 }
 
-function StoreListItem({ r, selectedId, cheapestId, searchPincode, onSelect }: { r: StoreResult; selectedId: string | null; cheapestId: string | null; searchPincode?: string | null; onSelect: (r: StoreResult) => void }) {
+function StoreListItem({
+  r,
+  selectedId,
+  cheapestId,
+  searchPincode,
+  onSelect,
+}: {
+  r: StoreResult
+  selectedId: string | null
+  cheapestId: string | null
+  searchPincode?: string | null
+  onSelect: (r: StoreResult) => void
+}) {
   const storePincode = usePincode(r.store.lat, r.store.lng, r.store.city)
-  
+
   return (
     <Item asChild size="sm">
       <button
@@ -69,42 +81,58 @@ function StoreListItem({ r, selectedId, cheapestId, searchPincode, onSelect }: {
         title={r.store.city || undefined}
         className={cn(
           "w-full text-left transition-colors animate-in fade-in-0 slide-in-from-bottom-1 hover:bg-muted/50",
-          r.store.id === selectedId && "bg-muted"
+          r.store.id === selectedId && "bg-muted/70 ring-1 ring-primary/20"
         )}
       >
         <ItemContent>
-          <ItemTitle className="flex items-center gap-1.5">
+          <ItemTitle className="flex items-center gap-1.5 flex-wrap">
             <PlatformBadge platform={getPlatformFromId(r.store.id)} size="sm" />
             <span>{prettyStoreName(r.store.name)}</span>
             {r.store.id === cheapestId && (
-              <Badge variant="outline" className="ml-1 text-[10px] uppercase tracking-wider text-amber-600 border-amber-200 bg-amber-50">Cheapest</Badge>
+              <Badge
+                variant="outline"
+                className="ml-1 text-[10px] uppercase tracking-wider text-amber-600 border-amber-200 bg-amber-50 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-800"
+              >
+                Cheapest
+              </Badge>
             )}
           </ItemTitle>
           <ItemDescription>
             {r.store.city ? `${r.store.city} · ` : ""}
-            {(storePincode || searchPincode) ? (
+            {storePincode || searchPincode ? (
               <span className="text-primary/70 font-medium">
                 {storePincode || searchPincode} ·{" "}
               </span>
-            ) : ""}
+            ) : (
+              ""
+            )}
             {r.distance_km} km away
           </ItemDescription>
         </ItemContent>
-        <ItemActions className="flex-col items-end gap-1">
+        <ItemActions className="flex-col items-end gap-1 shrink-0">
           {r.status === "in_stock" && r.price != null ? (
             <span className="text-sm font-semibold tabular-nums text-primary">
               ₹{formatPrice(r.price)}
             </span>
           ) : (
-            <span className="text-sm font-medium opacity-0">₹0</span> // spacer
+            <span className="text-sm font-medium opacity-0">₹0</span>
           )}
           {r.status === "in_stock" ? (
-            <Badge variant="secondary" className="bg-green-100 text-green-700 hover:bg-green-100 border-none font-medium h-5">
+            <Badge className="badge-in-stock h-5 text-[10px] font-semibold">
               IN STOCK
             </Badge>
+          ) : r.status === "out_of_stock" ? (
+            <Badge variant="secondary" className="h-5 text-[10px]">
+              Out of stock
+            </Badge>
+          ) : r.status === "not_carried" ? (
+            <Badge variant="outline" className="h-5 text-[10px] text-muted-foreground">
+              Limited
+            </Badge>
           ) : (
-            <Badge variant={STATUS_VARIANT[r.status]} className="h-5">
-              {STATUS_LABEL[r.status]}
+            // error status — show as muted "Unavailable" not alarming red
+            <Badge variant="outline" className="h-5 text-[10px] text-muted-foreground badge-unavailable">
+              Unavailable
             </Badge>
           )}
         </ItemActions>

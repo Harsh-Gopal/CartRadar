@@ -67,10 +67,15 @@ async def lifespan(app: FastAPI):
     yield
     for client in app.state.clients.values():
         await client.aclose()
-    # Close the shared Blinkit Playwright browser if it was started
+    # Close shared Playwright browsers (Blinkit + Swiggy)
     try:
-        from .platforms.blinkit import _close_browser
-        await _close_browser()
+        from .platforms.blinkit import _close_browser as blinkit_close
+        await blinkit_close()
+    except Exception:
+        pass
+    try:
+        from .platforms.swiggy import _close_browser as swiggy_close
+        await swiggy_close()
     except Exception:
         pass
     app.state.cache.close()
