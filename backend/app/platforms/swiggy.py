@@ -185,7 +185,10 @@ class SwiggyClient(PlatformClient):
 
     @property
     def supports_sweep(self) -> bool:
-        return True
+        # Swiggy uses Playwright which is too slow for a full grid sweep.
+        # Each probe takes 15-25s (full browser page load).
+        # We use simple_flow instead: single check at user's location.
+        return False
 
     @property
     def supports_geocoding(self) -> bool:

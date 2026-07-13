@@ -905,58 +905,11 @@ export function App() {
               ref={helpRef}
               value={helpValue}
               onValueChange={setHelpValue}
-              className="mt-auto scroll-mt-24"
+              className="mt-auto scroll-mt-24 hidden"
             >
-              <AccordionItem value="how">
-                <AccordionTrigger className="text-sm">
-                  How does this work?
-                </AccordionTrigger>
-                <AccordionContent className="flex flex-col gap-2 text-sm text-muted-foreground">
-                  <p>
-                    Paste a product link from Zepto, Instamart, or
-                    BigBasket. The app auto-detects which platform it's from
-                    and checks availability at nearby dark stores (for Zepto)
-                    or at your pincode (for other platforms).
-                  </p>
-                  <p>
-                    Stock and prices are checked live against each platform's
-                    own internal data — the same data their apps see.
-                  </p>
-                </AccordionContent>
-              </AccordionItem>
-              <AccordionItem value="price">
-                <AccordionTrigger className="text-sm">
-                  Why does the price differ from my app?
-                </AccordionTrigger>
-                <AccordionContent className="text-sm text-muted-foreground">
-                  This tool checks as a guest. Platforms apply campaign and
-                  subscription discounts in their apps that the public catalog
-                  doesn't expose, so prices here may be slightly higher. The
-                  relative comparison between stores still holds.
-                </AccordionContent>
-              </AccordionItem>
-              <AccordionItem value="slow">
-                <AccordionTrigger className="text-sm">
-                  Why is the first search in an area slow?
-                </AccordionTrigger>
-                <AccordionContent className="text-sm text-muted-foreground">
-                  Discovering the stores in a new area means sweeping the whole
-                  circle once. Mapped areas are remembered, so every later
-                  search there only runs the live stock checks and finishes in
-                  seconds.
-                </AccordionContent>
-              </AccordionItem>
-              <AccordionItem value="limited">
-                <AccordionTrigger className="text-sm">
-                  What does "Limited Distribution" mean?
-                </AccordionTrigger>
-                <AccordionContent className="text-sm text-muted-foreground">
-                  When a product shows as Limited Distribution, it means the platform 
-                  specifically doesn't allocate this item uniformly across all their local hubs. 
-                  Some areas won't carry it at all depending on their internal fulfillment routing.
-                </AccordionContent>
-              </AccordionItem>
+              {/* FAQ moved to the FAQ section below the main layout */}
             </Accordion>
+
             
               </div> {/* End Left Column */}
 
@@ -978,8 +931,46 @@ export function App() {
                         className="w-full h-full absolute inset-0"
                       />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center bg-muted/30 text-muted-foreground">
-                        {resolved ? "Ready to search map" : "Map will appear here"}
+                      /* Map skeleton — shown before any search has run */
+                      <div className="w-full h-full relative overflow-hidden bg-[#e8edf0] dark:bg-muted/20">
+                        {/* Fake map tile grid */}
+                        <svg className="absolute inset-0 w-full h-full opacity-30" xmlns="http://www.w3.org/2000/svg">
+                          <defs>
+                            <pattern id="map-grid" width="60" height="60" patternUnits="userSpaceOnUse">
+                              <path d="M 60 0 L 0 0 0 60" fill="none" stroke="currentColor" strokeWidth="0.5" className="text-muted-foreground"/>
+                            </pattern>
+                          </defs>
+                          <rect width="100%" height="100%" fill="url(#map-grid)" />
+                          {/* Fake roads */}
+                          <line x1="0" y1="35%" x2="100%" y2="38%" stroke="white" strokeWidth="4" opacity="0.6"/>
+                          <line x1="0" y1="60%" x2="100%" y2="62%" stroke="white" strokeWidth="3" opacity="0.5"/>
+                          <line x1="30%" y1="0" x2="28%" y2="100%" stroke="white" strokeWidth="4" opacity="0.6"/>
+                          <line x1="65%" y1="0" x2="67%" y2="100%" stroke="white" strokeWidth="3" opacity="0.5"/>
+                          {/* Fake blocks */}
+                          <rect x="5%" y="10%" width="20%" height="18%" rx="2" fill="white" opacity="0.25"/>
+                          <rect x="35%" y="8%" width="25%" height="22%" rx="2" fill="white" opacity="0.2"/>
+                          <rect x="5%" y="42%" width="18%" height="12%" rx="2" fill="white" opacity="0.2"/>
+                          <rect x="35%" y="42%" width="28%" height="14%" rx="2" fill="white" opacity="0.25"/>
+                          <rect x="72%" y="15%" width="22%" height="16%" rx="2" fill="white" opacity="0.2"/>
+                          <rect x="72%" y="42%" width="22%" height="20%" rx="2" fill="white" opacity="0.2"/>
+                          <rect x="5%" y="70%" width="55%" height="20%" rx="2" fill="white" opacity="0.2"/>
+                        </svg>
+                        {/* Shimmer overlay */}
+                        <div className="absolute inset-0 animate-pulse bg-gradient-to-br from-transparent via-white/10 to-transparent" />
+                        {/* Center label */}
+                        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
+                          <div className="flex flex-col items-center gap-2 bg-background/80 backdrop-blur-sm rounded-xl px-5 py-3 shadow-sm border">
+                            <div className="relative">
+                              <div className="w-6 h-6 rounded-full border-2 border-primary animate-ping absolute opacity-40" />
+                              <div className="w-6 h-6 rounded-full border-2 border-primary flex items-center justify-center relative">
+                                <div className="w-2.5 h-2.5 rounded-full bg-primary" />
+                              </div>
+                            </div>
+                            <p className="text-xs font-medium text-muted-foreground">
+                              {resolved ? "Set a location to see the map" : "Map will appear after search"}
+                            </p>
+                          </div>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -990,6 +981,125 @@ export function App() {
         )}
       </main>
 
+      {/* ── FAQ Section ─────────────────────────────────────────────── */}
+      {!locked && (
+        <section className="w-full max-w-3xl mx-auto px-4 md:px-6 pb-24 mt-4">
+          <h2 className="text-sm font-semibold text-muted-foreground mb-3 uppercase tracking-wide">Frequently Asked Questions</h2>
+          <Accordion
+            type="single"
+            collapsible
+            ref={helpRef}
+            value={helpValue}
+            onValueChange={setHelpValue}
+            className="scroll-mt-24"
+          >
+            <AccordionItem value="how">
+              <AccordionTrigger className="text-sm">How does Cart Radar work?</AccordionTrigger>
+              <AccordionContent className="flex flex-col gap-2 text-sm text-muted-foreground">
+                <p>
+                  Paste a product link from Zepto, Instamart, BigBasket, or Blinkit. Cart Radar
+                  auto-detects the platform, then sweeps nearby dark stores / warehouses
+                  using a hex-grid scan and checks live stock at each one.
+                </p>
+                <p>
+                  Stock and prices come directly from each platform's internal APIs — the same
+                  data their own apps use, checked in real time.
+                </p>
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="platforms">
+              <AccordionTrigger className="text-sm">Which platforms are supported?</AccordionTrigger>
+              <AccordionContent className="text-sm text-muted-foreground">
+                <p>Cart Radar currently supports:</p>
+                <ul className="list-disc pl-4 mt-1 space-y-1">
+                  <li><strong>Zepto</strong> — full store-level sweep with live stock</li>
+                  <li><strong>Swiggy Instamart</strong> — single-location check (platform restricts grid scanning)</li>
+                  <li><strong>BigBasket</strong> — pincode-based availability</li>
+                  <li><strong>Blinkit</strong> — full store-level sweep with live stock</li>
+                </ul>
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="price">
+              <AccordionTrigger className="text-sm">Why does the price differ from my app?</AccordionTrigger>
+              <AccordionContent className="text-sm text-muted-foreground">
+                Cart Radar checks as a guest (not logged in). Platforms apply subscription
+                discounts (like Zepto Pass or Swiggy One) and personalised offers in their
+                apps that the public catalogue doesn't show. The comparison between stores
+                is still accurate — it's the same baseline price for all.
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="slow">
+              <AccordionTrigger className="text-sm">Why is the first search in an area slow?</AccordionTrigger>
+              <AccordionContent className="text-sm text-muted-foreground">
+                Discovering stores in a new area means probing a grid of coordinates inside
+                your search radius — this only happens once. Once Cart Radar has mapped the
+                stores in an area, every later search there skips discovery and goes straight
+                to live stock checks, finishing in seconds.
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="limited">
+              <AccordionTrigger className="text-sm">What does "Limited Distribution" mean?</AccordionTrigger>
+              <AccordionContent className="text-sm text-muted-foreground">
+                Some products are not stocked uniformly across all dark stores. "Limited
+                Distribution" means the platform's fulfilment routing doesn't allocate
+                that item to every hub — so certain areas won't carry it regardless of
+                overall stock levels. Try widening your search radius to find a store
+                that does carry it.
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="address">
+              <AccordionTrigger className="text-sm">How do I use the nearby store address to order?</AccordionTrigger>
+              <AccordionContent className="text-sm text-muted-foreground">
+                <p>
+                  Tap any in-stock store to see its precise address. Copy it, then open
+                  the platform app and temporarily change your delivery address to that
+                  location — the stock is tied to the store's area, not your home address.
+                </p>
+                <p className="mt-1">
+                  Once you place the order you can switch your address back. The item
+                  will be picked from that specific dark store.
+                </p>
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="radius">
+              <AccordionTrigger className="text-sm">What search radius should I use?</AccordionTrigger>
+              <AccordionContent className="text-sm text-muted-foreground">
+                Start with 5–10 km for dense cities — most quick-commerce stores
+                serve within a 2–4 km radius of your location. If results come back
+                empty, try widening to 20 or 30 km to catch nearby towns or alternate
+                fulfilment zones. Larger radii take longer to scan on first use.
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="accuracy">
+              <AccordionTrigger className="text-sm">How accurate is the stock data?</AccordionTrigger>
+              <AccordionContent className="text-sm text-muted-foreground">
+                Stock data is fetched live at the time of your search — it's as accurate
+                as what the platform's own app would show. However, high-demand items can
+                go out of stock within minutes. If you see an item listed as "In Stock" but
+                can't order it, the inventory may have just cleared. Re-check to get
+                the latest status.
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="privacy">
+              <AccordionTrigger className="text-sm">Is my location data stored?</AccordionTrigger>
+              <AccordionContent className="text-sm text-muted-foreground">
+                Your location is only used to compute the search area — it's sent to
+                our backend only during an active search and not persisted after the
+                request. Scanned store locations are cached locally (on your device)
+                and on the backend to speed up future searches in the same area.
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
+        </section>
+      )}
       {/* Store detail bottom sheet */}
       <Drawer
         open={!!detail}

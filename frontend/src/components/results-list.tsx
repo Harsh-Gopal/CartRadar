@@ -71,6 +71,12 @@ function StoreListItem({
   onSelect: (r: StoreResult) => void
 }) {
   const storePincode = usePincode(r.store.lat, r.store.lng, r.store.city)
+  // Remove pincode already embedded in city string to avoid "City, 110092 · 110092" duplicates
+  const cityDisplay = r.store.city
+    ? r.store.city.replace(/[,\s]*(\d{6})[,\s]*/g, "").trim().replace(/[,·]+$/, "").trim()
+    : null
+  // Only show pincode badge if we actually have one
+  const displayPincode = storePincode || searchPincode || null
 
   return (
     <Item asChild size="sm">
@@ -98,10 +104,10 @@ function StoreListItem({
             )}
           </ItemTitle>
           <ItemDescription>
-            {r.store.city ? `${r.store.city} · ` : ""}
-            {storePincode || searchPincode ? (
+            {cityDisplay ? `${cityDisplay} · ` : ""}
+            {displayPincode ? (
               <span className="text-primary/70 font-medium">
-                {storePincode || searchPincode} ·{" "}
+                {displayPincode} ·{" "}
               </span>
             ) : (
               ""
