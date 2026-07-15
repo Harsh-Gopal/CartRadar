@@ -67,18 +67,14 @@ async def lifespan(app: FastAPI):
     yield
     for client in app.state.clients.values():
         await client.aclose()
-    # Close shared Playwright browsers (Blinkit + Swiggy)
+    # Close shared Playwright browser (Blinkit)
     try:
         from .platforms.blinkit import _close_browser as blinkit_close
         await blinkit_close()
     except Exception:
         pass
-    try:
-        from .platforms.swiggy import _close_browser as swiggy_close
-        await swiggy_close()
-    except Exception:
-        pass
     app.state.cache.close()
+
 
 
 app = FastAPI(title="cart-radar", lifespan=lifespan)

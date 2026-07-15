@@ -23,7 +23,8 @@ PLATFORM_HOSTS: dict[str, tuple[str, ...]] = {
 # -- Per-platform product ID regexes ----------------------------------------
 # Swiggy Instamart: /instamart/item/{alphanumeric_id}
 # and canonical SEO links like /instamart/p/{slug}-{alphanumeric_id}
-SWIGGY_PRODUCT_RE = re.compile(r"/instamart/(?:item|p)/(?:.*-)?([A-Za-z0-9_-]+)(?:[/?#]|$)")
+# and share links like /stores/instamart/item/{alphanumeric_id}
+SWIGGY_PRODUCT_RE = re.compile(r"/(?:stores/)?instamart/(?:item|p)/(?:.*-)?([A-Za-z0-9_-]+)(?:[/?#]|$)")
 # BigBasket: /pd/{numeric_id}/{slug}/
 BB_PRODUCT_RE = re.compile(r"/pd/(\d+)/")
 # Blinkit: /pr/{slug}/prid/{numeric_id}
