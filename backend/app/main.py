@@ -208,9 +208,9 @@ async def resolve_link(body: ResolveRequest, request: Request):
             if body.lat is not None and body.lng is not None:
                 product = await client.product_at_location(product_id, body.lat, body.lng)
             else:
-                # No coords — fetch metadata using fallback location (Bangalore)
+                # No coords — fetch metadata using fallback location (New Delhi — major Swiggy market)
                 try:
-                    product = await client.product_at_store(product_id, "dummy", 12.9716, 77.5946)
+                    product = await client.product_at_store(product_id, "dummy", 28.6139, 77.2090)
                 except Exception as e:
                     log.warning("Fallback metadata fetch failed: %s", e)
                     product = None

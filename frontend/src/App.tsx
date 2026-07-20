@@ -388,6 +388,9 @@ export function App() {
     lastRunKey !== null && searchKey !== null && searchKey !== lastRunKey
   const showResults =
     coords && (searching || state.phase === "done") && !homeOnlySearch
+  // Map shows whenever coords are set + a search has run (includes homeOnlySearch)  
+  const showMap =
+    coords && (searching || state.phase === "done")
   const pendingRows = searching
     ? Math.max(
         0,
@@ -917,7 +920,7 @@ export function App() {
               {(resolved || linkText) && (
                 <div className="hidden lg:block flex-1 w-full lg:sticky lg:top-24 lg:h-[calc(100vh-8rem)]">
                   <div className="w-full h-full rounded-2xl overflow-hidden border bg-card shadow-sm relative">
-                    {showResults && coords ? (
+                    {showMap && coords ? (
                       <ResultsMap
                         lat={coords.lat}
                         lng={coords.lng}
