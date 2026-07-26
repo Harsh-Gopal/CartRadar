@@ -129,14 +129,21 @@ class ZeptoClient(PlatformClient):
         async with self._handshake_lock:
             if not force and time.monotonic() - self._handshake_at < HANDSHAKE_MAX_AGE_S:
                 return
+            
+            # Reset blocked flag on new handshake attempt
+            self._is_blocked = False
+            
             resp = await self._client.request("HEAD", WEB_BASE + "/", headers={"Accept": "text/html"})
             if resp.status_code != 200:
                 resp = await self._client.get(WEB_BASE + "/", headers={"Accept": "text/html"})
+            
+            # If still not 200 (e.g. 202 Cloudflare challenge), mark as blocked and degrade gracefully
             if resp.status_code != 200:
-                raise ZeptoError(
-                    f"handshake blocked: HTTP {resp.status_code} — the proxy IP is likely "
-                    "flagged by Zepto (try a sticky residential session)"
-                )
+                log.warning(f"Zepto handshake blocked (HTTP {resp.status_code}). Will fallback to sample store.")
+                self._is_blocked = True
+                self._handshake_at = time.monotonic()
+                return
+
             if not self._client.cookies.get("session_id"):
                 raise ZeptoError("handshake did not issue session cookies")
             self._handshake_at = time.monotonic()
@@ -226,6 +233,17 @@ class ZeptoClient(PlatformClient):
     # -- store resolution ------------------------------------------------
 
     async def resolve_store(self, lat: float, lng: float, product_id: str | None = None) -> StoreResolution:
+        await self._ensure_session()
+        if getattr(self, "_is_blocked", False):
+            log.warning("Zepto is blocked; falling back to SAMPLE_STORE_ID for store resolution.")
+            return StoreResolution(
+                serviceable=True,
+                store_id=SAMPLE_STORE_ID,
+                store_name="Sample Store (Fallback)",
+                city="Unknown",
+                eta_minutes=15
+            )
+
         position = quote(
             json.dumps({"latitude": lat, "longitude": lng}, separators=(",", ":")), safe=""
         )
