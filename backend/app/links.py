@@ -16,6 +16,9 @@ UUID_RE = re.compile(UUID)
 PLATFORM_HOSTS: dict[str, tuple[str, ...]] = {
     "zepto": ("zepto.com", "zeptonow.com", "zepto.app.link"),
     "swiggy": ("swiggy.com",),
+    # BB Now MUST come before bigbasket — bbnow.bigbasket.com would otherwise
+    # match bigbasket's endswith(".bigbasket.com") check first.
+    "bbnow": ("bbnow.bigbasket.com",),
     "bigbasket": ("bigbasket.com", "bb.com", "bbdaily.com"),
     "blinkit": ("blinkit.com", "grofers.com", "blinkit.app.link"),
 }
@@ -25,10 +28,12 @@ PLATFORM_HOSTS: dict[str, tuple[str, ...]] = {
 # and canonical SEO links like /instamart/p/{slug}-{alphanumeric_id}
 # and share links like /stores/instamart/item/{alphanumeric_id}
 SWIGGY_PRODUCT_RE = re.compile(r"/(?:stores/)?instamart/(?:item|p)/(?:.*-)?([A-Za-z0-9_-]+)(?:[/?#]|$)")
-# BigBasket: /pd/{numeric_id}/{slug}/
-BB_PRODUCT_RE = re.compile(r"/pd/(\d+)/")
+# BigBasket product URL: /pd/{product_id}/{slug}/
+BB_PRODUCT_RE = re.compile(r"/pd/(\d+)(?:[/?#]|$)")
 # Blinkit: /pr/{slug}/prid/{numeric_id}
 BLINKIT_PRODUCT_RE = re.compile(r"/pr(?:oduct)?/(?:.*?/prid/)?(\d+)")
+# BB Now: same format as BigBasket (/pd/{numeric_id}/)
+BBNOW_PRODUCT_RE = re.compile(r"/pd/(\d+)(?:[/?#]|$)")
 
 
 def detect_platform(url: str) -> str | None:
@@ -67,6 +72,9 @@ def extract_product_id(text: str) -> tuple[str | None, str | None]:
     elif platform == "blinkit":
         m = BLINKIT_PRODUCT_RE.search(text)
         return ("blinkit", m.group(1)) if m else ("blinkit", None)
+    elif platform == "bbnow":
+        m = BBNOW_PRODUCT_RE.search(text)
+        return ("bbnow", m.group(1)) if m else ("bbnow", None)
 
     # Not a known platform URL — try raw pvid  extraction (Zepto-style)
     pid = _extract_zepto_id(text)

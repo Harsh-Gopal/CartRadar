@@ -24,6 +24,7 @@ from .platforms.zepto import SAMPLE_STORE_ID, ZeptoClient
 from .platforms.swiggy import SwiggyClient
 from .platforms.bigbasket import BigBasketClient
 from .platforms.blinkit import BlinkitClient
+from .platforms.bbnow import BBNowClient
 from .ratelimit import ConcurrencyGate, RateLimiter, TokenBucket
 from .search import run_search
 from .store_cache import StoreCache
@@ -43,6 +44,8 @@ def _create_clients() -> dict[str, PlatformClient]:
         clients["bigbasket"] = BigBasketClient(config.PROXY_URL, config.BB_CONCURRENCY)
     if "blinkit" in config.ENABLED_PLATFORMS:
         clients["blinkit"] = BlinkitClient(config.PROXY_URL, 5) # Default 5 concurrency
+    if "bbnow" in config.ENABLED_PLATFORMS:
+        clients["bbnow"] = BBNowClient(config.PROXY_URL, 4)
     log.info("enabled platforms: %s", list(clients.keys()))
     return clients
 

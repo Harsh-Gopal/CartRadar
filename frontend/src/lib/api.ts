@@ -166,6 +166,7 @@ export const PLATFORM_COLORS: Record<string, string> = {
   swiggy: "#FC8019",       // Swiggy orange
   bigbasket: "#84C225",    // BigBasket green
   blinkit: "#F5C913",      // Blinkit yellow
+  bbnow: "#C4162A",        // Tata Neu / BB Now red
 }
 
 export const PLATFORM_LABELS: Record<string, string> = {
@@ -173,12 +174,14 @@ export const PLATFORM_LABELS: Record<string, string> = {
   swiggy: "Instamart",
   bigbasket: "BigBasket",
   blinkit: "Blinkit",
+  bbnow: "BB Now",
 }
 
 export function detectPlatformFromUrl(url: string): string | null {
   const lower = url.toLowerCase()
   if (lower.includes("zepto.com") || lower.includes("zeptonow.com")) return "zepto"
   if (lower.includes("swiggy.com")) return "swiggy"
+  if (lower.includes("bbnow.bigbasket.com")) return "bbnow"
   if (lower.includes("bigbasket.com") || lower.includes("bb.com")) return "bigbasket"
   if (lower.includes("blinkit.com") || lower.includes("grofers.com")) return "blinkit"
   // Zepto pvid pattern

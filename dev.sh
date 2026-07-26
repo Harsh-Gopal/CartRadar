@@ -20,7 +20,7 @@ echo "==> Frontend deps"
 
 # DEV_MODE lifts all rate limits / search & probe budgets / radius cap locally.
 # ENABLED_PLATFORMS enables all implemented platforms.
-(cd backend && DEV_MODE=1 ENABLED_PLATFORMS=zepto,swiggy,bigbasket,blinkit uv run python -m uvicorn app.main:app --port 8000 --reload) &
+(cd backend && DEV_MODE=1 ENABLED_PLATFORMS=zepto,swiggy,bigbasket,blinkit,bbnow uv run python -m uvicorn app.main:app --port 8000 --reload) &
 
 echo "Waiting for backend to start on port 8000..."
 while ! nc -z localhost 8000; do   

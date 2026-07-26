@@ -136,7 +136,7 @@ function save(key: string, value: unknown) {
 function looksResolvable(text: string): boolean {
   return (
     /\/pvid\/[0-9a-fA-F-]{36}/.test(text) ||
-    ((/zepto|swiggy|bigbasket|blinkit|instamart/i.test(text) ||
+    ((/zepto|swiggy|bigbasket|blinkit|bbnow|instamart/i.test(text) ||
       detectPlatformFromUrl(text) !== null) &&
       /https?:\/\//.test(text))
   )
@@ -531,7 +531,7 @@ export function App() {
                 </CardTitle>
                 {!resolved && (
                   <CardDescription>
-                    Paste a link from Zepto, Instamart, BigBasket, or Blinkit
+                    Paste a link from Zepto, Instamart, BigBasket, Blinkit, or BB Now
                     — it loads automatically.
                   </CardDescription>
                 )}
@@ -544,7 +544,7 @@ export function App() {
                     </InputGroupAddon>
                     <InputGroupInput
                       id="link"
-                      placeholder="Paste a product link from Zepto, Instamart, BigBasket, Blinkit…"
+                      placeholder="Paste a product link from Zepto, Instamart, BigBasket, Blinkit, or BB Now…"
                       value={linkText}
                       aria-invalid={resolveError ? true : undefined}
                       onChange={(e) => setLinkText(e.target.value)}
@@ -1000,7 +1000,7 @@ export function App() {
               <AccordionTrigger className="text-sm">How does Cart Radar work?</AccordionTrigger>
               <AccordionContent className="flex flex-col gap-2 text-sm text-muted-foreground">
                 <p>
-                  Paste a product link from Zepto, Instamart, BigBasket, or Blinkit. Cart Radar
+                  Paste a product link from Zepto, Instamart, BigBasket, Blinkit, or BB Now (Tata Neu). Cart Radar
                   auto-detects the platform, then sweeps nearby dark stores / warehouses
                   using a hex-grid scan and checks live stock at each one.
                 </p>
@@ -1020,6 +1020,7 @@ export function App() {
                   <li><strong>Swiggy Instamart</strong> — single-location check (platform restricts grid scanning)</li>
                   <li><strong>BigBasket</strong> — pincode-based availability</li>
                   <li><strong>Blinkit</strong> — full store-level sweep with live stock</li>
+                  <li><strong>BB Now</strong> — express 30-min delivery via Tata Neu (BigBasket product links work too)</li>
                 </ul>
               </AccordionContent>
             </AccordionItem>

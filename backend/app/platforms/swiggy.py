@@ -71,9 +71,10 @@ async def _fetch_product_html(product_id: str, lat: float | None = None, lng: fl
         "Cache-Control": "no-cache",
     }
     
-    # Include userLocation cookie to get location-aware stock
+    # Include userLocation cookie to get location-aware stock.
+    # Pass a non-empty address — Swiggy CDN may serve a generic page if address is blank.
     if lat is not None and lng is not None:
-        loc_val = urllib.parse.quote(json.dumps({"lat": lat, "lng": lng, "address": ""}))
+        loc_val = urllib.parse.quote(json.dumps({"lat": lat, "lng": lng, "address": "India"}))
         headers["Cookie"] = f"userLocation={loc_val}"
     
     try:
@@ -187,13 +188,23 @@ def _html_to_product(html: str, product_id: str, lat: float | None, lng: float |
             image_url = images
         elif isinstance(images, list) and images:
             image_url = images[0]
+        elif isinstance(images, dict):
+            image_url = images.get("url") or images.get("contentUrl")
     if not image_url:
         image_url = og.get("image")
+    # Raw regex fallback — catches image URLs embedded in JS or non-standard JSON-LD
+    if not image_url:
+        m = re.search(r'"image"\s*:\s*"(https://[^"]+(?:instamart|swiggy)[^"]+\.(?:png|jpg|jpeg|webp)[^"]*)"', html)
+        if m:
+            image_url = m.group(1)
     
     # ── Price / Availability ───────────────────────────────────────────────────
     price = None
     mrp = None
-    status = "in_stock"  # Default: JSON-LD with InStock means available
+    # Conservative default: only mark in_stock when JSON-LD explicitly confirms it.
+    # If the cookie location is not served by Instamart, the page returns generic
+    # HTML without JSON-LD, and we must NOT assume the product is available.
+    status = "out_of_stock"
     
     if jsonld:
         offers = jsonld.get("offers", {})
@@ -208,16 +219,13 @@ def _html_to_product(html: str, product_id: str, lat: float | None, lng: float |
                     mrp = price
                 except Exception:
                     pass
-            # Availability
+            # Availability — only trust the explicit schema.org signal
             avail = offers.get("availability", "")
-            if "OutOfStock" in avail or "Discontinued" in avail or "SoldOut" in avail:
-                status = "out_of_stock"
-            elif "InStock" in avail or "PreOrder" in avail:
+            if "InStock" in avail or "PreOrder" in avail or "LimitedAvailability" in avail:
                 status = "in_stock"
-    
-    # Additional availability signals from HTML content
-    if "out of stock" in html.lower() and "add to cart" not in html.lower():
-        status = "out_of_stock"
+            elif "OutOfStock" in avail or "Discontinued" in avail or "SoldOut" in avail:
+                status = "out_of_stock"
+            # else: no availability signal → stays out_of_stock (conservative)
     
     if not name:
         log.warning("Swiggy: could not extract product name for %s", product_id)
