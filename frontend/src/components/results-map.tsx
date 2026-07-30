@@ -82,7 +82,7 @@ function StoreMarker({ r, selectedId, searchPincode, onSelect }: { r: StoreResul
             </span>
           )}
           <div className="flex items-center justify-between gap-4 mt-1">
-            <span className="text-xs text-muted-foreground">{r.distance_km} km away</span>
+            <span className="text-xs text-muted-foreground">{r.distance_km === 0 ? "at your location" : `${r.distance_km} km away`}</span>
             <span className="font-medium text-primary">
               {r.status === "in_stock" ? `₹${r.price}` : STATUS_LABEL[r.status]}
             </span>

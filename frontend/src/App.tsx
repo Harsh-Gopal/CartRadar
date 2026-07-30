@@ -1117,7 +1117,7 @@ export function App() {
               <DrawerHeader>
                 <DrawerTitle>{prettyStoreName(detail.store.name)}</DrawerTitle>
                 <DrawerDescription>
-                  {[detail.store.city, `${detail.distance_km} km away`]
+                  {[detail.store.city, detail.distance_km === 0 ? "at your location" : `${detail.distance_km} km away`]
                     .filter(Boolean)
                     .join(" · ")}
                 </DrawerDescription>

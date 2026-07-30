@@ -112,7 +112,7 @@ function StoreListItem({
             ) : (
               ""
             )}
-            {r.distance_km} km away
+            {r.distance_km === 0 ? "at your location" : `${r.distance_km} km away`}
           </ItemDescription>
         </ItemContent>
         <ItemActions className="flex-col items-end gap-1 shrink-0">

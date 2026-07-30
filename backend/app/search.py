@@ -138,6 +138,34 @@ async def run_search(
             }
         )
 
+        # Always emit a store_result for the home store so it appears in the
+        # map and stores list. Without this, cities/areas with only one dark
+        # store (e.g. smaller cities like Patna) show zero store_result events,
+        # triggering the "Search nearby stores anyway" button — even though the
+        # sweep correctly ran and found the one store via the home check.
+        if home.serviceable and home.store_id and home_product:
+            _home_store_entry = Store(
+                id=home.store_id,
+                name=home.store_name,
+                city=home.city,
+                lat=lat,
+                lng=lng,
+                platform=platform,
+            )
+            counts["stores"] += 1
+            _h_status = home_product.status
+            counts[_h_status] = counts.get(_h_status, 0) + 1
+            await emit(
+                {
+                    "type": "store_result",
+                    "store": asdict(_home_store_entry),
+                    "distance_km": 0.0,
+                    "status": _h_status,
+                    "price": home_product.price,
+                    "mrp": home_product.mrp,
+                }
+            )
+
         # 2. Stock checks for cached stores
         for store in cache.stores_within(lat, lng, radius_km, platform):
             start_check(store)
