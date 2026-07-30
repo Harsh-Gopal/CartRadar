@@ -1,20 +1,23 @@
-"""Swiggy Instamart platform client — httpx + JSON-LD scraping.
+"""Swiggy Instamart platform client — httpx + Redux-state scraping.
 
-Swiggy's AWS WAF blocks automated requests to /instamart/item/{id}.
-However, the /stores/instamart/item/{id} endpoint (used for app-store
-deep links and SEO) returns full 200 responses with structured data:
-  - JSON-LD schema.org/Product with name, brand, images, price, availability
-  - Open Graph meta tags as fallback
+Swiggy's /stores/instamart/item/{id} endpoint returns a full HTML page with
+an embedded Redux state object containing:
+  - storeDetailsV2: current store ID and serviceability for the lat/lng in cookie
+  - productV2.itemData: accurate inStock, brand, name, price, imageIds
 
-This lets us use plain httpx (no Playwright needed!) which is:
-  - Fast (~1-2s vs 30s+ for Playwright)
-  - Reliable (no WAF challenge pages)
-  - Parallel-friendly
+This means we can:
+1. Support hex-grid sweeping like Zepto — send different lat/lng cookies to discover stores
+2. Get accurate per-store stock status (not just location-level averages)
+3. Show each Instamart "dark store" as a separate result with its ETA
 
-Availability note:
-  The /stores/ endpoint reflects real-time stock status for the location
-  inferred from the userLocation cookie. Since we can't set cookies easily
-  in httpx, we use multiple fallback strategies to detect stock.
+Architecture:
+  resolve_store(lat, lng) → fetches the page with userLocation cookie → extracts storeId, 
+      SLA, and serviceable status from storeDetailsV2
+  product_at_store(product_id, store_id, lat, lng) → fetches same page → reads 
+      productV2.inStock for stock status
+  supports_sweep = True → hex-grid sweep across the search radius
+
+CDN URL pattern: https://instamart-media-assets.swiggy.com/swiggy/image/upload/fl_lossy,f_auto,q_auto/{imageId}
 """
 
 from __future__ import annotations
@@ -34,49 +37,35 @@ log = logging.getLogger("swiggy")
 
 WEB_BASE = "https://www.swiggy.com"
 STORES_BASE = f"{WEB_BASE}/stores/instamart/item"
+CDN_BASE = "https://instamart-media-assets.swiggy.com/swiggy/image/upload/fl_lossy,f_auto,q_auto"
 
 # User-Agent that bypasses WAF on /stores/instamart/ endpoint
 _UA_BOT = "Googlebot/2.1 (+http://www.google.com/bot.html)"
-_UA_MOBILE = (
-    "Mozilla/5.0 (Linux; Android 12; SM-G991B) AppleWebKit/537.36 "
-    "(KHTML, like Gecko) Chrome/112.0.0.0 Mobile Safari/537.36"
-)
-
-# Per-product cache (product_id → base metadata, no location-specific status)
-_META_CACHE: dict[str, dict] = {}
-_META_LOCK = asyncio.Lock()
-
-# Geo label cache
-_GEO_CACHE: dict[tuple[float, float], str] = {}
-_GEO_LOCK = asyncio.Lock()
 
 
 class SwiggyError(PlatformError):
     pass
 
 
-async def _fetch_product_html(product_id: str, lat: float | None = None, lng: float | None = None) -> str:
-    """Fetch the /stores/instamart/item/ page which bypasses WAF.
-    
-    Sets the userLocation cookie if lat/lng provided, which affects
-    the availability reported in the JSON-LD offers block.
-    """
+def _make_location_cookie(lat: float, lng: float) -> str:
+    """Build the userLocation cookie value with lat/lng and non-empty address."""
+    val = json.dumps({"lat": lat, "lng": lng, "address": "India"})
+    return "userLocation=" + urllib.parse.quote(val)
+
+
+async def _fetch_page(product_id: str, lat: float | None = None, lng: float | None = None) -> str:
+    """Fetch the /stores/instamart/item/ page with optional location cookie."""
     url = f"{STORES_BASE}/{product_id}"
-    
-    headers = {
+    headers: dict[str, str] = {
         "User-Agent": _UA_BOT,
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         "Accept-Language": "en-IN,en;q=0.9",
         "Accept-Encoding": "gzip, deflate, br",
         "Cache-Control": "no-cache",
     }
-    
-    # Include userLocation cookie to get location-aware stock.
-    # Pass a non-empty address — Swiggy CDN may serve a generic page if address is blank.
     if lat is not None and lng is not None:
-        loc_val = urllib.parse.quote(json.dumps({"lat": lat, "lng": lng, "address": "India"}))
-        headers["Cookie"] = f"userLocation={loc_val}"
-    
+        headers["Cookie"] = _make_location_cookie(lat, lng)
+
     try:
         async with httpx.AsyncClient(
             timeout=httpx.Timeout(20.0),
@@ -93,204 +82,159 @@ async def _fetch_product_html(product_id: str, lat: float | None = None, lng: fl
         return ""
 
 
-def _parse_jsonld(html: str) -> dict | None:
-    """Extract JSON-LD Product block from HTML."""
-    blocks = re.findall(
-        r'<script[^>]+type=["\']application/ld\+json["\'][^>]*>(.*?)</script>',
-        html,
-        re.DOTALL,
-    )
-    for raw in blocks:
+def _extract_redux(html: str) -> dict:
+    """
+    Extract key fields from the embedded Redux state in the page HTML.
+
+    Returns a dict with:
+      - store_id: str | None
+      - serviceable: bool
+      - eta_minutes: int | None
+      - name: str | None
+      - brand: str | None
+      - in_stock: bool | None (None means no itemData present)
+      - is_avail: bool | None
+      - price: float | None
+      - mrp: float | None
+      - image_url: str | None
+    """
+    result: dict[str, Any] = {
+        "store_id": None,
+        "serviceable": False,
+        "eta_minutes": None,
+        "name": None,
+        "brand": None,
+        "in_stock": None,
+        "is_avail": None,
+        "price": None,
+        "mrp": None,
+        "image_url": None,
+    }
+
+    if not html:
+        return result
+
+    # ── Store ID (storeDetailsV2.storeId) ────────────────────────────────────
+    sid_m = re.search(r'"storeDetailsV2"\s*:\s*\{"storeId"\s*:\s*"(\d+)"', html)
+    if sid_m:
+        result["store_id"] = sid_m.group(1)
+
+    # ── Serviceability: inferred from whether storeId + product data are present ─
+    # Note: primaryStore.serviceabilityStatus can be NON_SERVICEABLE even when the
+    # store does serve the area (it just means no "fast" delivery guarantee).
+    # Real non-serviceability is signaled by storeId being absent from the page.
+    result["serviceable"] = bool(result.get("store_id"))
+
+    # ── ETA: look for any sla value > 0 in the page ──────────────────────────
+    eta_m = re.search(r'"sla"\s*:\s*\{"value"\s*:\s*"(\d+)"', html)
+    if eta_m:
         try:
-            data = json.loads(raw.strip())
-            if isinstance(data, list):
-                for item in data:
-                    if isinstance(item, dict) and item.get("@type") == "Product":
-                        return item
-            elif isinstance(data, dict) and data.get("@type") == "Product":
-                return data
-        except Exception:
+            val = int(eta_m.group(1))
+            if val > 0:
+                result["eta_minutes"] = val
+        except ValueError:
             pass
-    return None
 
+    # ── Product data (productV2.itemData) ────────────────────────────────────
+    prod_idx = html.find('"productV2"')
+    if prod_idx >= 0:
+        # We need a generous window — the itemData can be large
+        chunk = html[prod_idx: prod_idx + 5000]
 
-def _parse_og_tags(html: str) -> dict:
-    """Extract Open Graph tags as fallback metadata."""
-    result = {}
-    for prop, key in [
-        ("og:title", "title"),
-        ("og:image", "image"),
-        ("og:description", "description"),
-    ]:
-        m = re.search(
-            rf'<meta[^>]+property=["\']({re.escape(prop)})["\'][^>]*content=["\']([^"\']*)["\']',
-            html,
-            re.IGNORECASE,
+        name_m = re.search(r'"displayName"\s*:\s*"([^"]+)"', chunk)
+        brand_m = re.search(r'"brand"\s*:\s*"([^"]+)"', chunk)
+        instock_m = re.search(r'"inStock"\s*:\s*(true|false)', chunk)
+        isavail_m = re.search(r'"isAvail"\s*:\s*(true|false)', chunk)
+
+        result["name"] = name_m.group(1) if name_m else None
+        result["brand"] = brand_m.group(1) if brand_m else None
+        result["in_stock"] = (instock_m.group(1) == "true") if instock_m else None
+        result["is_avail"] = (isavail_m.group(1) == "true") if isavail_m else None
+
+        # Price (offerPrice)
+        offer_m = re.search(
+            r'"offerPrice"\s*:\s*\{"currencyCode"\s*:\s*"INR"\s*,\s*"units"\s*:\s*"(\d+)"', chunk
         )
-        if not m:
-            # Try alternate attribute order
-            m = re.search(
-                rf'<meta[^>]+content=["\']([^"\']*)["\'][^>]*property=["\']({re.escape(prop)})["\']',
-                html,
-                re.IGNORECASE,
-            )
-            if m:
-                result[key] = m.group(1)
-        else:
-            result[key] = m.group(2)
+        mrp_m = re.search(
+            r'"mrp"\s*:\s*\{"currencyCode"\s*:\s*"INR"\s*,\s*"units"\s*:\s*"(\d+)"', chunk
+        )
+        if offer_m:
+            result["price"] = float(offer_m.group(1))
+        if mrp_m:
+            result["mrp"] = float(mrp_m.group(1))
+
+        # Image (first imageId)
+        img_m = re.search(r'"imageIds"\s*:\s*\["([^"]+)"', chunk)
+        if img_m:
+            result["image_url"] = f"{CDN_BASE}/{img_m.group(1)}"
+
+    # ── Fallback image from JSON-LD ──────────────────────────────────────────
+    if not result["image_url"]:
+        jsonld_blocks = re.findall(
+            r'<script[^>]+type=["\']application/ld\+json["\'][^>]*>(.*?)</script>',
+            html, re.DOTALL
+        )
+        for raw in jsonld_blocks:
+            try:
+                data = json.loads(raw.strip())
+                if isinstance(data, list):
+                    for item in data:
+                        if isinstance(item, dict) and item.get("@type") == "Product":
+                            data = item
+                            break
+                if isinstance(data, dict) and data.get("@type") == "Product":
+                    images = data.get("image", [])
+                    if isinstance(images, str):
+                        result["image_url"] = images
+                    elif isinstance(images, list) and images:
+                        result["image_url"] = images[0]
+                    elif isinstance(images, dict):
+                        result["image_url"] = images.get("url") or images.get("contentUrl")
+                    if result["image_url"]:
+                        break
+            except Exception:
+                pass
+
     return result
 
 
-def _clean_name(raw: str) -> str:
-    """Clean up Swiggy product title."""
-    # Remove: "Buy X Online (weight) At Best Price"
-    name = re.sub(r'^Buy\s+', '', raw, flags=re.IGNORECASE)
-    name = re.sub(r'\s+Online\s*(?:\([^)]+\))?\s*(?:At Best Price|on Instamart|in India)?$', '', name, flags=re.IGNORECASE)
-    return name.strip()
-
-
-def _html_to_product(html: str, product_id: str, lat: float | None, lng: float | None) -> ProductResult:
-    """Parse HTML to ProductResult using JSON-LD and OG fallbacks."""
-    if not html:
+def _data_to_product(data: dict, product_id: str) -> ProductResult:
+    """Convert parsed Redux data to a ProductResult."""
+    if not data.get("name"):
         return ProductResult(status="not_carried")
-    
-    jsonld = _parse_jsonld(html)
-    og = _parse_og_tags(html)
-    
-    # ── Name ─────────────────────────────────────────────────────────────────
-    name = None
-    if jsonld:
-        name = jsonld.get("name")
-    if not name:
-        og_title = og.get("title", "")
-        if og_title:
-            name = _clean_name(og_title)
-    if not name:
-        # Fall back to <title> tag
-        m = re.search(r'<title[^>]*>([^<]+)</title>', html)
-        if m:
-            name = _clean_name(m.group(1))
-    
-    # ── Brand ─────────────────────────────────────────────────────────────────
-    brand = None
-    if jsonld:
-        brand_obj = jsonld.get("brand", {})
-        if isinstance(brand_obj, dict):
-            brand = brand_obj.get("name")
-        elif isinstance(brand_obj, str):
-            brand = brand_obj
-    
-    # ── Image ─────────────────────────────────────────────────────────────────
-    image_url = None
-    if jsonld:
-        images = jsonld.get("image", [])
-        if isinstance(images, str):
-            image_url = images
-        elif isinstance(images, list) and images:
-            image_url = images[0]
-        elif isinstance(images, dict):
-            image_url = images.get("url") or images.get("contentUrl")
-    if not image_url:
-        image_url = og.get("image")
-    # Raw regex fallback — catches image URLs embedded in JS or non-standard JSON-LD
-    if not image_url:
-        m = re.search(r'"image"\s*:\s*"(https://[^"]+(?:instamart|swiggy)[^"]+\.(?:png|jpg|jpeg|webp)[^"]*)"', html)
-        if m:
-            image_url = m.group(1)
-    
-    # ── Price / Availability ───────────────────────────────────────────────────
-    price = None
-    mrp = None
-    # Conservative default: only mark in_stock when JSON-LD explicitly confirms it.
-    # If the cookie location is not served by Instamart, the page returns generic
-    # HTML without JSON-LD, and we must NOT assume the product is available.
-    status = "out_of_stock"
-    
-    if jsonld:
-        offers = jsonld.get("offers", {})
-        if isinstance(offers, list):
-            offers = offers[0] if offers else {}
-        if isinstance(offers, dict):
-            # Price
-            raw_price = offers.get("price")
-            if raw_price is not None:
-                try:
-                    price = float(raw_price)
-                    mrp = price
-                except Exception:
-                    pass
-            # Availability — only trust the explicit schema.org signal
-            avail = offers.get("availability", "")
-            if "InStock" in avail or "PreOrder" in avail or "LimitedAvailability" in avail:
-                status = "in_stock"
-            elif "OutOfStock" in avail or "Discontinued" in avail or "SoldOut" in avail:
-                status = "out_of_stock"
-            # else: no availability signal → stays out_of_stock (conservative)
-    
-    if not name:
-        log.warning("Swiggy: could not extract product name for %s", product_id)
-        return ProductResult(status="not_carried")
-    
+
+    in_stock = data.get("in_stock")
+    if in_stock is True:
+        status = "in_stock"
+    elif in_stock is False:
+        status = "out_of_stock"
+    else:
+        # Fallback to conservative out_of_stock when data is missing
+        status = "out_of_stock"
+
     return ProductResult(
         status=status,
-        name=name,
-        brand=brand,
-        image_url=image_url,
-        price=price,
-        mrp=mrp,
+        name=data.get("name"),
+        brand=data.get("brand"),
+        image_url=data.get("image_url"),
+        price=data.get("price"),
+        mrp=data.get("mrp"),
     )
 
 
-async def _get_location_label(lat: float, lng: float) -> str:
-    """Reverse-geocode coordinates to a human-readable label."""
-    key = (round(lat, 2), round(lng, 2))
-    async with _GEO_LOCK:
-        if key in _GEO_CACHE:
-            return _GEO_CACHE[key]
-    try:
-        url = (
-            f"https://nominatim.openstreetmap.org/reverse"
-            f"?lat={round(lat, 4)}&lon={round(lng, 4)}&format=json"
-        )
-        async with httpx.AsyncClient(timeout=5.0) as c:
-            resp = await c.get(url, headers={"User-Agent": "CartRadar/1.0"})
-            if resp.status_code == 200:
-                data = resp.json()
-                addr = data.get("address", {})
-                suburb = (
-                    addr.get("suburb")
-                    or addr.get("neighbourhood")
-                    or addr.get("village")
-                    or ""
-                )
-                city = addr.get("city") or addr.get("town") or addr.get("county") or ""
-                postcode = addr.get("postcode", "")
-                label = ", ".join(filter(bool, [suburb, city, postcode]))
-                if label:
-                    async with _GEO_LOCK:
-                        _GEO_CACHE[key] = label
-                    await asyncio.sleep(1.1)  # Nominatim rate limit
-                    return label
-    except Exception as e:
-        log.debug("Geocoding error: %s", e)
-    
-    label = "Local Area"
-    async with _GEO_LOCK:
-        _GEO_CACHE[key] = label
-    return label
-
-
 class SwiggyClient(PlatformClient):
-    """Swiggy Instamart client using httpx + JSON-LD HTML scraping.
-    
-    Uses the /stores/instamart/item/ endpoint which:
-    - Returns 200 without WAF challenge
-    - Contains JSON-LD structured data with product name, images, price, stock
-    - Works with a simple Googlebot user-agent header
+    """Swiggy Instamart client using httpx + Redux-state scraping.
+
+    Supports full hex-grid sweeping. Each grid point fetches the product page
+    with a location cookie and extracts the assigned store ID + stock status.
+    This reveals multiple Instamart dark stores across the search radius.
     """
 
-    def __init__(self, proxy_url: str | None = None, concurrency: int = 5, transport=None):
+    def __init__(self, proxy_url: str | None = None, concurrency: int = 6, transport=None):
         self._semaphore = asyncio.Semaphore(concurrency)
+        # Cache: (product_id, store_id) -> ProductResult — avoids duplicate checks for same store
+        self._store_cache: dict[tuple[str, str], ProductResult] = {}
+        self._store_cache_lock = asyncio.Lock()
 
     @property
     def platform_name(self) -> str:
@@ -302,9 +246,8 @@ class SwiggyClient(PlatformClient):
 
     @property
     def supports_sweep(self) -> bool:
-        # Instamart only shows stock for current location, not per-store.
-        # Sweeping the grid would still show same result. Single check is enough.
-        return False
+        # Enabled — we can discover multiple dark stores via hex-grid sweep
+        return True
 
     @property
     def supports_geocoding(self) -> bool:
@@ -314,29 +257,39 @@ class SwiggyClient(PlatformClient):
         pass
 
     async def resolve_share_link(self, url: str) -> str | None:
-        # Product ID is in the URL path
         from ..links import SWIGGY_PRODUCT_RE
         m = SWIGGY_PRODUCT_RE.search(url)
         return m.group(1) if m else None
 
-    async def product_at_location(self, product_id: str, lat: float, lng: float) -> ProductResult:
-        """Fetch product availability for a specific location."""
-        async with self._semaphore:
-            html = await _fetch_product_html(product_id, lat, lng)
-            return _html_to_product(html, product_id, lat, lng)
-
     async def resolve_store(
         self, lat: float, lng: float, product_id: str | None = None
     ) -> StoreResolution:
-        """Virtual store resolution — Instamart doesn't expose store IDs."""
-        store_id = f"swiggy_{round(lat, 3)}_{round(lng, 3)}"
-        city = await _get_location_label(lat, lng)
+        """Probe a lat/lng to discover which Instamart dark store serves it.
+
+        Returns a StoreResolution with the store_id embedded in the page's Redux state.
+        If no product_id given, fetches with a known-stable placeholder item.
+        """
+        pid = product_id or "F9UK3KLPCI"  # generic item used only for store discovery
+        async with self._semaphore:
+            html = await _fetch_page(pid, lat, lng)
+
+        data = _extract_redux(html)
+        store_id = data.get("store_id")
+        eta = data.get("eta_minutes")
+        serviceable = data.get("serviceable", False)
+
+        if not store_id:
+            return StoreResolution(serviceable=False)
+
+        # Build a human-readable store name from ETA
+        store_label = f"Instamart ({eta} min)" if eta else "Instamart"
+
         return StoreResolution(
-            serviceable=True,
+            serviceable=serviceable,
             store_id=store_id,
-            store_name="Instamart",
-            eta_minutes=20,
-            city=city,
+            store_name=store_label,
+            eta_minutes=eta,
+            city=None,  # Will be set by StoreCache via Nominatim if needed
         )
 
     async def product_at_store(
@@ -346,10 +299,36 @@ class SwiggyClient(PlatformClient):
         lat: float | None = None,
         lng: float | None = None,
     ) -> ProductResult:
-        """Check product at a store (use lat/lng for location-aware check)."""
+        """Check stock at a specific Instamart store.
+
+        We pass the same lat/lng that was used to discover this store, so the
+        page returns the same storeId and product data we need.
+        """
+        # Cache by (product_id, store_id) to avoid re-fetching if same store found via many grid points
+        cache_key = (product_id, store_id)
+        async with self._store_cache_lock:
+            cached = self._store_cache.get(cache_key)
+        if cached is not None:
+            return cached
+
         if lat is not None and lng is not None:
-            return await self.product_at_location(product_id, lat, lng)
-        # No location: fetch metadata-only (no stock check)
+            async with self._semaphore:
+                html = await _fetch_page(product_id, lat, lng)
+        else:
+            async with self._semaphore:
+                html = await _fetch_page(product_id)
+
+        data = _extract_redux(html)
+        result = _data_to_product(data, product_id)
+
+        async with self._store_cache_lock:
+            self._store_cache[cache_key] = result
+
+        return result
+
+    async def product_at_location(self, product_id: str, lat: float, lng: float) -> ProductResult:
+        """Direct location check (used by _simple_flow fallback if needed)."""
         async with self._semaphore:
-            html = await _fetch_product_html(product_id)
-            return _html_to_product(html, product_id, None, None)
+            html = await _fetch_page(product_id, lat, lng)
+        data = _extract_redux(html)
+        return _data_to_product(data, product_id)
