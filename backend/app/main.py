@@ -230,44 +230,98 @@ async def resolve_link(body: ResolveRequest, request: Request):
 
 @app.get("/api/geocode", dependencies=[Depends(require_access)])
 async def geocode(q: str = Query(min_length=2), request: Request = None):
-    """Geocode using the first available platform geocoder (Zepto's)."""
-    # Use Zepto's geocoder as the default since it's backed by Google Maps
+    """Geocode using the first available platform geocoder (Zepto's) with Nominatim fallback."""
     zepto = request.app.state.clients.get("zepto")
     if zepto and zepto.supports_geocoding:
         try:
             result = await zepto.geocode(q)
+            if result:
+                return result
         except PlatformError as e:
-            raise HTTPException(502, f"Geocoding error: {e}")
-        if not result:
-            raise HTTPException(404, "Location not found. Try a pincode or locality name.")
-        return result
-    raise HTTPException(501, "No geocoding provider available. Enable Zepto platform.")
+            log.warning("Zepto geocode failed: %s, falling back to Nominatim", e)
+    
+    # Fallback to Nominatim
+    async with httpx.AsyncClient() as c:
+        try:
+            from urllib.parse import quote
+            resp = await c.get(
+                f"https://nominatim.openstreetmap.org/search?q={quote(q)}&format=json&countrycodes=in&limit=1",
+                headers={"User-Agent": "CartRadar/1.0"}
+            )
+            if resp.status_code == 200 and resp.json():
+                data = resp.json()[0]
+                return {"lat": float(data["lat"]), "lng": float(data["lon"]), "label": data.get("display_name", q)}
+        except Exception as e:
+            log.warning("Nominatim geocode failed: %s", e)
+    
+    raise HTTPException(404, "Location not found. Try a pincode or locality name.")
 
 
 @app.get("/api/suggest", dependencies=[Depends(require_access)])
 async def suggest(q: str = Query(min_length=2), request: Request = None):
-    """Place autocomplete using Zepto's geocoder."""
+    """Place autocomplete using Zepto's geocoder with Nominatim fallback."""
     zepto = request.app.state.clients.get("zepto")
     if zepto and zepto.supports_geocoding:
         try:
             return {"suggestions": await zepto.autocomplete(q)}
         except PlatformError as e:
-            raise HTTPException(502, f"Geocoding error: {e}")
-    raise HTTPException(501, "No geocoding provider available.")
+            log.warning("Zepto suggest failed: %s, falling back to Nominatim", e)
+
+    # Fallback to Nominatim
+    async with httpx.AsyncClient() as c:
+        try:
+            from urllib.parse import quote
+            resp = await c.get(
+                f"https://nominatim.openstreetmap.org/search?q={quote(q)}&format=json&countrycodes=in&limit=5",
+                headers={"User-Agent": "CartRadar/1.0"}
+            )
+            if resp.status_code == 200:
+                suggestions = []
+                for item in resp.json():
+                    suggestions.append({
+                        "place_id": str(item["place_id"]),
+                        "description": item["display_name"],
+                        "main_text": item["name"],
+                        "secondary_text": item["display_name"].replace(item["name"] + ", ", "").strip(", ")
+                    })
+                return {"suggestions": suggestions}
+        except Exception as e:
+            log.warning("Nominatim suggest failed: %s", e)
+    
+    return {"suggestions": []}
 
 
 @app.get("/api/place", dependencies=[Depends(require_access)])
 async def place(place_id: str = Query(min_length=4), label: str = "", request: Request = None):
+    """Get location coordinates for a place_id with Nominatim fallback."""
     zepto = request.app.state.clients.get("zepto")
-    if zepto and hasattr(zepto, "place_details"):
+    if zepto and zepto.supports_geocoding:
         try:
             result = await zepto.place_details(place_id, label)
+            if result:
+                return result
         except PlatformError as e:
-            raise HTTPException(502, f"Geocoding error: {e}")
-        if not result:
-            raise HTTPException(404, "Couldn't locate that place.")
-        return result
-    raise HTTPException(501, "No geocoding provider available.")
+            log.warning("Zepto place_details failed: %s, falling back", e)
+
+    # If it was a Nominatim place_id, we can fetch it via Nominatim details API.
+    # Alternatively, since our frontend uses `onCoords(await placeDetails(s.place_id, s.description))`,
+    # we can fallback by geocoding the label if the place_id fails.
+    if label:
+        async with httpx.AsyncClient() as c:
+            try:
+                from urllib.parse import quote
+                resp = await c.get(
+                    f"https://nominatim.openstreetmap.org/search?q={quote(label)}&format=json&countrycodes=in&limit=1",
+                    headers={"User-Agent": "CartRadar/1.0"}
+                )
+                if resp.status_code == 200 and resp.json():
+                    data = resp.json()[0]
+                    return {"lat": float(data["lat"]), "lng": float(data["lon"]), "label": label}
+            except Exception as e:
+                log.warning("Nominatim place details fallback failed: %s", e)
+
+    raise HTTPException(404, "Place details not found.")
+
 
 
 SSE_HEADERS = {"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}

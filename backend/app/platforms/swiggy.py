@@ -276,16 +276,23 @@ class SwiggyClient(PlatformClient):
         data = _extract_redux(html)
         store_id = data.get("store_id")
         eta = data.get("eta_minutes")
-        serviceable = data.get("serviceable", False)
-
+        
+        # If store_id is missing, it could mean the location is unserviceable OR
+        # that the specific product is just not carried in this region's catalog.
+        # To avoid aborting the entire radial sweep, we synthesize a store ID
+        # based on a ~4km grid (0.04 degrees). This groups nearby points into
+        # a single "synthetic" store, preventing 91 fake stores on the map while
+        # still allowing the sweep to complete and return "Not Carried".
         if not store_id:
-            return StoreResolution(serviceable=False)
+            grid_lat = round(lat / 0.04) * 0.04
+            grid_lng = round(lng / 0.04) * 0.04
+            store_id = f"synthetic_{grid_lat:.2f}_{grid_lng:.2f}"
 
         # Build a human-readable store name from ETA
         store_label = f"Instamart ({eta} min)" if eta else "Instamart"
 
         return StoreResolution(
-            serviceable=serviceable,
+            serviceable=True,  # Optimistically assume serviceable to allow sweep
             store_id=store_id,
             store_name=store_label,
             eta_minutes=eta,

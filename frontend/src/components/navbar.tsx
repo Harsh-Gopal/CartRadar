@@ -95,7 +95,7 @@ export function Navbar() {
         {/* Right */}
         <div className="flex items-center gap-2">
           <a
-            href="https://github.com/HarshGopal/CartRadar"
+            href="https://github.com/Harsh-Gopal/CartRadar"
             target="_blank"
             rel="noopener noreferrer"
             className="hidden sm:inline-flex items-center gap-1 text-[12px] text-muted-foreground hover:text-foreground transition-colors px-3 py-1.5 rounded-md hover:bg-muted"

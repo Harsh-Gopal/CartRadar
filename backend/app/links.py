@@ -9,7 +9,8 @@ from urllib.parse import parse_qs, urlparse
 
 # -- Zepto patterns -------------------------------------------------------
 UUID = r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"
-PVID_RE = re.compile(rf"/pvid/({UUID})")
+# Matches /pvid/UUID or /pn/product-slug/UUID
+PVID_RE = re.compile(rf"/(?:pvid|pn(?:/[^/]+)?)/({UUID})")
 UUID_RE = re.compile(UUID)
 
 # -- Platform host mappings ------------------------------------------------
