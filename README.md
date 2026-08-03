@@ -1,61 +1,91 @@
+<div align="center">
+
 # 🎯 Cart Radar
 
-**Find products in stock near you — across Zepto, Swiggy Instamart, BigBasket, and Blinkit — all at once.**
+**Real-time grocery stock checker across Indian quick-commerce platforms**
 
-Cart Radar scans multiple quick-commerce platforms simultaneously, showing you exactly which stores near you have a product in stock, at what price, and how far away they are — all on a live map.
+[![GitHub](https://img.shields.io/badge/GitHub-Harsh--Gopal-181717?logo=github)](https://github.com/Harsh-Gopal)
+[![Repo](https://img.shields.io/badge/Repo-CartRadar-blue?logo=github)](https://github.com/Harsh-Gopal/CartRadar)
+[![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
+[![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)](https://python.org)
+[![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)](https://react.dev)
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Python 3.12+](https://img.shields.io/badge/Python-3.12+-indigo.svg)](https://www.python.org/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-React-blue.svg)](https://www.typescriptlang.org/)
+*Built and maintained by [@Harsh-Gopal](https://github.com/Harsh-Gopal)*
 
----
-
-## ✨ Features
-
-- 🗺️ **Live map view** — see in-stock stores plotted on an interactive map
-- ⚡ **Multi-platform scan** — Zepto, Instamart, BigBasket, Blinkit in one search
-- 📍 **Adjustable radius** — scan 5 km, 10 km, 20 km, or 30 km around your location
-- 💰 **Price comparison** — find the cheapest store for your product
-- 📋 **Address suggestions** — copy nearby landmark addresses for delivery
-- 🌙 **Dark mode** — full dark/light theme support
-- 🏎️ **Hex-grid sweep** — fast parallel scanning of stores using geohex coverage
-- 💾 **Store caching** — discovered stores are cached locally for faster future scans
+</div>
 
 ---
 
-## 🚀 Quick Start
+## ✨ What is Cart Radar?
+
+Cart Radar is a web app that lets you paste any product link from a supported Indian grocery delivery platform and instantly see **which stores near you** have it in stock — including stores that aren't your default delivery zone.
+
+Instead of just checking your nearest store, Cart Radar performs a **hex-grid sweep** of the surrounding area, probing multiple delivery zones to find every store that has the product.
+
+---
+
+## 🛒 Supported Platforms
+
+| Platform | Stock Check | Area Sweep | Notes |
+|---|---|---|---|
+| **Zepto** | ✅ | ✅ | Hex-grid sweep across 5–30 km |
+| **Swiggy Instamart** | ✅ | ✅ | Multi-zone sweep |
+| **BigBasket** | ✅ | ✅ | Cookie-based location spoofing |
+| **Blinkit** | ✅ | ✅ | Playwright-based |
+| **BB Now** | ✅ | ❌ | Express delivery only |
+| **Tata Neu** | 🚧 | 🚧 | Planned |
+| **Amazon Fresh** | 🚧 | 🚧 | Planned |
+| **Flipkart Minutes** | 🚧 | 🚧 | Planned |
+
+---
+
+## 🚀 Getting Started
 
 ### Prerequisites
+- Python 3.11+
+- Node.js 20+
+- [uv](https://github.com/astral-sh/uv) (Python package manager)
 
-- [Python 3.12+](https://www.python.org/downloads/)
-- [uv](https://github.com/astral-sh/uv) — fast Python package manager
-- [Node.js 18+](https://nodejs.org/)
-- [pnpm](https://pnpm.io/installation)
-
-### Installation
+### 1. Clone the repository
 
 ```bash
-git clone https://github.com/HarshGopal/CartRadar.git
+git clone https://github.com/Harsh-Gopal/CartRadar.git
 cd CartRadar/cart-radar
-
-# Install all dependencies
-cd backend && uv sync
-cd ../frontend && pnpm install
-cd ..
-
-# Install Playwright browsers (needed for Blinkit + Swiggy)
-cd backend && uv run playwright install chromium
 ```
 
-### Run in development mode
+### 2. Start the backend
 
 ```bash
-./dev.sh
+cd backend
+uv sync
+DEV_MODE=true uv run uvicorn app.main:app --port 8001 --reload
 ```
 
-The app will be available at **http://localhost:5173**
+### 3. Start the frontend
 
-The backend API runs at **http://localhost:8000**
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+### 4. Open in browser
+
+Navigate to [http://localhost:5173](http://localhost:5173)
+
+---
+
+## 📱 How to Use
+
+1. **Set your location** — Type an area name, locality, or pincode in the location search box. Use the GPS button to auto-detect your current location.
+
+2. **Paste a product link** — Copy any product URL from Zepto, Swiggy, BigBasket, Blinkit, or BB Now and paste it in the product link box. The app auto-detects the platform.
+
+3. **Set search radius** — Adjust the radius slider (5 km to 30 km) based on how far you're willing to look.
+
+4. **Check availability** — Click "Check Availability". Results stream in real-time showing which stores have the product and at what price.
+
+5. **View on map** — Switch to Map view to see all store pins with availability colour-coded (green = in stock, orange = out of stock).
 
 ---
 
@@ -63,164 +93,108 @@ The backend API runs at **http://localhost:8000**
 
 ```
 cart-radar/
-├── backend/              # FastAPI Python backend
+├── backend/
 │   └── app/
-│       ├── main.py       # FastAPI app, WebSocket search endpoint
-│       ├── search.py     # Search orchestrator (hex-grid sweep)
-│       ├── grid.py       # Hex-grid point generation
-│       ├── store_cache.py # SQLite store cache
-│       ├── config.py     # Environment configuration
+│       ├── main.py           # FastAPI entry point, routing, auth
+│       ├── search.py         # SSE orchestration, hex-grid sweep
+│       ├── store_cache.py    # SQLite cache for discovered stores
+│       ├── grid.py           # Haversine distance + hex-grid generator
+│       ├── links.py          # URL/product-ID parser (all platforms)
+│       ├── ratelimit.py      # Token bucket rate limiter
+│       ├── config.py         # Environment-based configuration
 │       └── platforms/
 │           ├── base.py       # PlatformClient ABC
-│           ├── zepto.py      # Zepto (HTTP API)
-│           ├── swiggy.py     # Swiggy Instamart (Playwright)
-│           ├── bigbasket.py  # BigBasket (SSR scraping)
-│           └── blinkit.py    # Blinkit (Playwright)
-└── frontend/             # React + TypeScript frontend
+│           ├── zepto.py      # Zepto client
+│           ├── swiggy.py     # Swiggy Instamart client
+│           ├── bigbasket.py  # BigBasket client
+│           ├── blinkit.py    # Blinkit (Playwright) client
+│           └── bbnow.py      # BB Now client
+└── frontend/
     └── src/
-        ├── App.tsx       # Main app component
-        ├── components/   # UI components (map, results, navbar)
-        ├── hooks/        # useSearch WebSocket hook
-        └── lib/          # API client, utilities
+        ├── App.tsx           # Main application component
+        ├── hooks/
+        │   └── use-search.ts # SSE event stream hook
+        ├── components/       # UI components
+        └── lib/
+            └── api.ts        # Backend API client
 ```
 
-**Tech stack:** FastAPI · httpx · Playwright · SQLite · React · TypeScript · Vite · Leaflet · shadcn/ui
+### Key Design Decisions
+
+- **SSE Streaming** — Results stream in real-time via Server-Sent Events. Users see stores appear one by one as the sweep progresses, instead of waiting for all results.
+- **Hex-Grid Sweep** — Store discovery uses a hexagonally-packed grid to minimize gaps and overlap while covering a circular area efficiently.
+- **SQLite Store Cache** — Discovered stores and probed coordinates are cached locally (90-day TTL) to speed up repeat searches.
+- **Unified Platform Interface** — All platforms implement the same `PlatformClient` ABC (`resolve_store` + `product_at_store`), making it trivial to add new platforms.
+- **Token Bucket Rate Limiting** — Per-IP rate limits with daily caps prevent abuse without requiring authentication.
 
 ---
 
-## 🛒 Supported Platforms
+## ⚙️ Configuration
 
-| Platform | Method | Status | Notes |
-|----------|--------|--------|-------|
-| **Zepto** | HTTP API | ✅ Full | Hex-grid sweep, fastest |
-| **BigBasket** | SSR scraping | ✅ Full | Uses location cookies |
-| **Blinkit** | Playwright | ✅ Working | Slower; uses headless Chrome |
-| **Swiggy Instamart** | Playwright | ⚠️ Limited | AWS WAF sometimes blocks |
-
-> **Note on Swiggy:** Swiggy uses AWS WAF that intermittently blocks automated browsers. When blocking occurs, stores are shown as "Unavailable" rather than an error. This is a known limitation.
-
----
-
-## 🔧 Configuration
-
-Create a `.env` file in the `cart-radar/` directory (optional):
-
-```env
-# Optional: restrict access with a token
-APP_TOKEN=your-secret-token
-
-# Optional: proxy URL for all platform requests
-PROXY_URL=http://user:pass@proxy.example.com:8080
-
-# Optional: set default search radius (default: 5km, max: 30km)
-DEFAULT_RADIUS_KM=5
-MAX_RADIUS_KM=30
-```
-
-### Environment Variables
+Set these environment variables to configure the backend:
 
 | Variable | Default | Description |
-|----------|---------|-------------|
-| `ENABLED_PLATFORMS` | `zepto,swiggy,bigbasket,blinkit` | Comma-separated list of platforms to enable |
-| `DEV_MODE` | `false` | Disables rate limits and probe budgets |
-| `APP_TOKEN` | *(none)* | If set, requires this token to use the API |
-| `MAX_RADIUS_KM` | `30` | Maximum search radius allowed |
-| `PROXY_URL` | *(none)* | HTTP proxy for all platform requests |
+|---|---|---|
+| `DEV_MODE` | `false` | Disables auth token requirement |
+| `APP_TOKEN` | — | Required auth token (when `DEV_MODE=false`) |
+| `MAX_RADIUS_KM` | `50.0` | Maximum search radius |
+| `SWEEP_SPACING_KM` | `2.0` | Spacing between hex-grid probe points |
+| `MAX_CONCURRENT` | `5` | Max concurrent platform requests |
+| `RATE_LIMIT_RPM` | `10` | Max requests per minute per IP |
+| `RATE_LIMIT_DAILY` | `200` | Max requests per day per IP |
+| `ENABLED_PLATFORMS` | all | Comma-separated list of enabled platforms |
+| `DB_PATH` | `stores.sqlite3` | Path to the SQLite store cache |
 
 ---
 
-## 📡 API Reference
+## 🔒 Security
 
-### `POST /api/resolve`
-Resolve a product URL to a product ID and platform.
-
-```json
-{ "url": "https://www.zepto.com/pn/coca-cola/pvid/abc..." }
-```
-
-### `WebSocket /api/search`
-Stream availability results in real-time.
-
-```json
-{
-  "pvid": "abc...",
-  "platform": "zepto",
-  "lat": 28.6139,
-  "lng": 77.2090,
-  "radius_km": 5
-}
-```
-
-**Events emitted:**
-- `discovery_start` — sweep beginning
-- `home_result` — availability at your exact location
-- `store_result` — per-store availability
-- `done` — search complete with summary
-
-### `GET /api/geocode?q=<query>`
-Geocode a location string.
-
-### `GET /api/suggest?q=<query>`
-Get place name suggestions.
-
-### `GET /api/config`
-Get instance configuration (enabled platforms, radius limits).
+- **No credentials stored** — The app never stores passwords or API keys.
+- **HMAC token auth** — Optional auth token uses `hmac.compare_digest` (timing-safe).
+- **Input validation** — All API inputs validated via Pydantic models.
+- **Rate limiting** — Token bucket per IP + daily caps prevent abuse.
+- **XSS safe** — All geocode queries are URL-encoded before passing to Nominatim. All user input is treated as plain text, never rendered as HTML.
 
 ---
 
-## 🧪 Testing
+## 🐛 Known Issues & Roadmap
 
-```bash
-cd backend
+See [`docs/BUGS.md`](docs/BUGS.md) for the full bug tracker and [`docs/AUDIT_REPORT.md`](docs/AUDIT_REPORT.md) for the comprehensive audit report.
 
-# Run all tests
-uv run pytest
+### Critical (Fixed ✅)
+- **Geocode 500 error** — `httpx` import was missing in `main.py`, causing HTTP 500 on all Nominatim geocoding fallback paths. Fixed.
+- **Zepto WAF bypass** — Zepto blocks automated requests (HTTP 202). Fallback to `SAMPLE_STORE_ID` for product preview. Store sweep still works.
 
-# Test a specific platform manually
-uv run python -c "
-import asyncio
-from app.platforms.zepto import ZeptoClient
-async def test():
-    c = ZeptoClient()
-    result = await c.product_at_location('pvid-here', 28.6139, 77.2090)
-    print(result)
-asyncio.run(test())
-"
-```
+### Planned Improvements
+- [ ] Code-split JS bundle (currently 580KB — Leaflet is the main contributor)
+- [ ] CORS origins via environment variable (currently hardcoded to localhost)
+- [ ] Blinkit native API (replace Playwright for better sweep performance)
+- [ ] Tata Neu / Flipkart Minutes / Amazon Fresh integration
+- [ ] Automated test suite (pytest for backend, Vitest for frontend)
+- [ ] Open Graph / SEO meta tags
 
 ---
 
-## 📝 Example Product Links
+## 🤝 Contributing
 
-Test Cart Radar with these real product URLs:
+Contributions are welcome! Please:
 
-- **Zepto:** `https://www.zepto.com/pn/as-it-is-one-whey-protein-concentrate-2kg-unflavoured/pvid/7ea5fa66-41b8-48de-99bd-dd667193ea62`
-- **Zepto:** `https://www.zepto.com/pn/as-it-is-one-whey-protein-concentrate-1kg-unflavoured/pvid/e671118a-e1fa-4ce0-9cca-762cb630391c`
-- **Swiggy:** `https://www.swiggy.com/stores/instamart/item/PSHOXYIK8Y`
-- **Swiggy:** `https://www.swiggy.com/stores/instamart/item/F9UK3KLPCI`
-- **BigBasket:** `https://www.bigbasket.com/pd/40000263/bb-popular-toorarhar-dal-2-kg-pouch/`
-- **BigBasket:** `https://www.bigbasket.com/pd/40339391/boat-type-c-c600-sturdy-cable/`
-
----
-
-## 🚦 Known Limitations
-
-1. **Swiggy WAF blocking** — AWS WAF intermittently blocks headless browsers. Products show as "Unavailable" when blocked.
-2. **Rate limits** — Real IP addresses may get rate-limited after many searches. Use `PROXY_URL` in production.
-3. **Blinkit slow scans** — Playwright-based scans take 15-25 seconds per grid point due to page load time.
-4. **BigBasket single warehouse** — BigBasket uses city-level fulfilment, not micro dark-stores like Zepto.
+1. Fork the repo
+2. Create a feature branch: `git checkout -b feature/my-feature`
+3. Make your changes
+4. Run the build: `cd frontend && npm run build`
+5. Open a Pull Request
 
 ---
 
 ## 📄 License
 
-MIT — see [LICENSE](LICENSE)
+MIT License — see [LICENSE](LICENSE) for details.
 
 ---
 
-## 🙏 Acknowledgements
+<div align="center">
 
-- [OpenStreetMap / Nominatim](https://nominatim.org/) — reverse geocoding
-- [Overpass API](https://overpass-api.de/) — nearby landmark lookup
-- [Leaflet.js](https://leafletjs.com/) — interactive maps
-- [shadcn/ui](https://ui.shadcn.com/) — UI components
+Made with ❤️ by [@Harsh-Gopal](https://github.com/Harsh-Gopal) | [GitHub](https://github.com/Harsh-Gopal/CartRadar)
+
+</div>

@@ -134,13 +134,16 @@ function save(key: string, value: unknown) {
 }
 
 function looksResolvable(text: string): boolean {
+  // Zepto /pvid/ or /pn/product-slug/UUID format
+  if (/\/(?:pvid|pn\/[^/]+)\/[0-9a-fA-F-]{36}/.test(text)) return true
+  // Other supported platform URLs
   return (
-    /\/pvid\/[0-9a-fA-F-]{36}/.test(text) ||
-    ((/zepto|swiggy|bigbasket|blinkit|bbnow|instamart/i.test(text) ||
+    (/zepto|swiggy|bigbasket|blinkit|bbnow|instamart/i.test(text) ||
       detectPlatformFromUrl(text) !== null) &&
-      /https?:\/\//.test(text))
+    /https?:\/\//.test(text)
   )
 }
+
 
 const RADIUS_PRESETS = [5, 10, 20, 30]
 

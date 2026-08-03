@@ -5,11 +5,13 @@ correct PlatformClient.
 """
 
 import hmac
+import httpx
 import json
 import logging
 from ipaddress import ip_address
 from contextlib import asynccontextmanager
 from dataclasses import asdict
+from urllib.parse import quote
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -18,7 +20,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from . import config
-from .links import detect_platform, extract_product_id, first_url, looks_like_product_link
+from .links import detect_platform, extract_product_id, first_url
 from .platforms.base import PlatformClient, PlatformError
 from .platforms.zepto import SAMPLE_STORE_ID, ZeptoClient
 from .platforms.swiggy import SwiggyClient
@@ -241,12 +243,11 @@ async def geocode(q: str = Query(min_length=2), request: Request = None):
             log.warning("Zepto geocode failed: %s, falling back to Nominatim", e)
     
     # Fallback to Nominatim
-    async with httpx.AsyncClient() as c:
+    async with httpx.AsyncClient(timeout=10.0) as c:
         try:
-            from urllib.parse import quote
             resp = await c.get(
                 f"https://nominatim.openstreetmap.org/search?q={quote(q)}&format=json&countrycodes=in&limit=1",
-                headers={"User-Agent": "CartRadar/1.0"}
+                headers={"User-Agent": "CartRadar/1.0 (github.com/Harsh-Gopal/CartRadar)"}
             )
             if resp.status_code == 200 and resp.json():
                 data = resp.json()[0]
@@ -268,12 +269,11 @@ async def suggest(q: str = Query(min_length=2), request: Request = None):
             log.warning("Zepto suggest failed: %s, falling back to Nominatim", e)
 
     # Fallback to Nominatim
-    async with httpx.AsyncClient() as c:
+    async with httpx.AsyncClient(timeout=10.0) as c:
         try:
-            from urllib.parse import quote
             resp = await c.get(
                 f"https://nominatim.openstreetmap.org/search?q={quote(q)}&format=json&countrycodes=in&limit=5",
-                headers={"User-Agent": "CartRadar/1.0"}
+                headers={"User-Agent": "CartRadar/1.0 (github.com/Harsh-Gopal/CartRadar)"}
             )
             if resp.status_code == 200:
                 suggestions = []
@@ -307,12 +307,11 @@ async def place(place_id: str = Query(min_length=4), label: str = "", request: R
     # Alternatively, since our frontend uses `onCoords(await placeDetails(s.place_id, s.description))`,
     # we can fallback by geocoding the label if the place_id fails.
     if label:
-        async with httpx.AsyncClient() as c:
+        async with httpx.AsyncClient(timeout=10.0) as c:
             try:
-                from urllib.parse import quote
                 resp = await c.get(
                     f"https://nominatim.openstreetmap.org/search?q={quote(label)}&format=json&countrycodes=in&limit=1",
-                    headers={"User-Agent": "CartRadar/1.0"}
+                    headers={"User-Agent": "CartRadar/1.0 (github.com/Harsh-Gopal/CartRadar)"}
                 )
                 if resp.status_code == 200 and resp.json():
                     data = resp.json()[0]
