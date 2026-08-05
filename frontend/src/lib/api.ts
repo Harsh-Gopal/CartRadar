@@ -122,6 +122,17 @@ async function request<T>(input: string, init: RequestInit = {}): Promise<T> {
     } catch {
       // non-JSON error body
     }
+    // Make common errors user-friendly
+    if (res.status === 502 || res.status === 503) {
+      throw new Error(
+        detail.startsWith("HTTP")
+          ? "The platform returned an error — it may be temporarily unavailable. Try again in a moment."
+          : detail
+      )
+    }
+    if (res.status === 429) {
+      throw new Error("Too many requests — please wait a moment before trying again.")
+    }
     throw new Error(detail)
   }
   return res.json()

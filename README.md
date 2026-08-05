@@ -14,6 +14,9 @@
 
 </div>
 
+> [!NOTE]
+> **This project is in active development.** You may occasionally encounter bugs, slow responses, or unavailable platform data — quick-commerce APIs change frequently and some platforms block automated access. If something breaks, wait a moment and try again, or [open an issue](https://github.com/Harsh-Gopal/CartRadar/issues). Contributions and bug reports are welcome!
+
 ---
 
 ## ✨ What is Cart Radar?
@@ -130,15 +133,19 @@ pnpm dev
 
 ## 📱 How to Use
 
-1. **Set your location** — Type an area name, locality, or pincode in the location search box. Use the GPS button to auto-detect your current location.
+1. **Paste a product link** — Copy any product URL from Zepto, Swiggy, BigBasket, Blinkit, or BB Now and paste it in the link box. The app auto-detects the platform instantly.
 
-2. **Paste a product link** — Copy any product URL from Zepto, Swiggy, BigBasket, Blinkit, or BB Now and paste it in the product link box. The app auto-detects the platform.
+2. **Set your location** — Type an area name, locality, or pincode — or tap the GPS button to auto-detect. The app remembers your last location.
 
-3. **Set search radius** — Adjust the radius slider (5 km to 30 km) based on how far you're willing to look.
+3. **Set search radius** — Adjust the radius (5–30 km) based on how far you're willing to look. Start with 5–10 km in dense cities.
 
-4. **Check availability** — Click "Check Availability". Results stream in real-time showing which stores have the product and at what price.
+4. **Check availability** — Hit "Check Availability". Results stream in real time showing which stores have it and at what price.
 
-5. **View on map** — Switch to Map view to see all store pins with availability colour-coded (green = in stock, orange = out of stock).
+5. **Get a store address** — **Tap any store row** to open its detail sheet, which shows the precise delivery address. Copy it and temporarily change your delivery address in the platform app to order from that store.
+
+6. **View on map** — Switch to Map view to see all store pins colour-coded by stock status (green = in stock, orange = out of stock).
+
+7. **Watchlist** — While viewing a resolved product, tap the **Bookmark** button to save it to your Watchlist. Access saved products anytime from the Watchlist tab on the home screen — no sign-in required, stored locally in your browser.
 
 ---
 

@@ -15,6 +15,9 @@ import {
   Cancel01Icon,
   ArrowUpRight01Icon,
   Copy01Icon,
+  Bookmark01Icon,
+  BookmarkAdd01Icon,
+  InformationCircleIcon,
 } from "@hugeicons/core-free-icons"
 import { toast } from "sonner"
 
@@ -116,6 +119,34 @@ interface RecentProduct {
   link: string
 }
 
+interface WatchlistItem {
+  pvid: string
+  platform: string
+  name: string
+  image_url: string | null
+  link: string
+  addedAt: number
+}
+
+/** Extract a human-readable name from a product URL slug as a last resort. */
+function extractNameFromUrl(url: string): string | null {
+  try {
+    const path = new URL(url).pathname
+    // Match slugs like /pn/amul-gold-milk/UUID or /cn/dairy/amul-gold/UUID
+    const m = path.match(/\/(?:pn|cn)\/([^/]+)(?:\/[^/]+)*\/[0-9a-f-]{36}/i)
+    if (m) return m[1].replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
+    // Fallback: last meaningful path segment
+    const parts = path.split("/").filter(Boolean)
+    const slug = parts[parts.length - 2] || parts[parts.length - 1] || ""
+    if (slug && !/^[0-9a-f-]{36}$/i.test(slug)) {
+      return slug.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
+    }
+  } catch {
+    // bad URL — ignore
+  }
+  return null
+}
+
 function load<T>(key: string): T | null {
   try {
     const raw = localStorage.getItem(key)
@@ -215,6 +246,13 @@ export function App() {
   const [recent, setRecent] = useState<RecentProduct[]>(
     () => load("mf.recent") ?? []
   )
+  const [watchlist, setWatchlist] = useState<WatchlistItem[]>(
+    () => load("mf.watchlist") ?? []
+  )
+  const [homeTab, setHomeTab] = useState<"recent" | "watchlist">("recent")
+  const [storeHintSeen, setStoreHintSeen] = useState<boolean>(
+    () => load("mf.hint_seen") ?? false
+  )
   const [coords, setCoordsState] = useState<GeocodeResponse | null>(() =>
     load("mf.coords")
   )
@@ -227,6 +265,43 @@ export function App() {
   const [detail, setDetail] = useState<StoreResult | null>(null)
   const [view, setView] = useState<"map" | "list">("map")
   const [lastRunKey, setLastRunKey] = useState<string | null>(null)
+
+  // -- watchlist helpers --
+  function isInWatchlist(pvid: string) {
+    return watchlist.some((w) => w.pvid === pvid)
+  }
+  function addToWatchlist(item: WatchlistItem) {
+    setWatchlist((prev) => {
+      const next = [item, ...prev.filter((w) => w.pvid !== item.pvid)].slice(0, 20)
+      save("mf.watchlist", next)
+      return next
+    })
+  }
+  function removeFromWatchlist(pvid: string) {
+    setWatchlist((prev) => {
+      const next = prev.filter((w) => w.pvid !== pvid)
+      save("mf.watchlist", next)
+      return next
+    })
+  }
+  function toggleWatchlist() {
+    if (!resolved) return
+    const pvid = resolved.pvid
+    if (isInWatchlist(pvid)) {
+      removeFromWatchlist(pvid)
+      toast("Removed from watchlist")
+    } else {
+      addToWatchlist({
+        pvid,
+        platform: resolved.platform,
+        name: resolved.product?.name ?? extractNameFromUrl(linkText) ?? "Product",
+        image_url: resolved.product?.image_url ?? null,
+        link: linkText,
+        addedAt: Date.now(),
+      })
+      toast.success("Added to watchlist")
+    }
+  }
 
   const [appConfig, setAppConfig] = useState<AppConfig | null>(null)
   const [hasToken, setHasToken] = useState(() => !!getToken())
@@ -285,13 +360,28 @@ export function App() {
           {
             pvid: result.pvid,
             platform: result.platform,
-            name: result.product?.name ?? null,
+            name: result.product?.name ?? extractNameFromUrl(text) ?? null,
             image_url: result.product?.image_url ?? null,
             link: text,
           },
           ...prev.filter((p) => p.pvid !== result.pvid),
-        ].slice(0, 4)
+        ].slice(0, 5)
         save("mf.recent", next)
+        return next
+      })
+      // If this product is already in the watchlist, silently refresh its name/image
+      setWatchlist((prev) => {
+        if (!prev.some((w) => w.pvid === result.pvid)) return prev
+        const next = prev.map((w) =>
+          w.pvid === result.pvid
+            ? {
+                ...w,
+                name: result.product?.name ?? w.name,
+                image_url: result.product?.image_url ?? w.image_url,
+              }
+            : w
+        )
+        save("mf.watchlist", next)
         return next
       })
     } catch (e) {
@@ -436,6 +526,10 @@ export function App() {
   function handleSelect(result: StoreResult) {
     setSelectedId(result.store.id)
     setDetail(result)
+    if (!storeHintSeen) {
+      setStoreHintSeen(true)
+      save("mf.hint_seen", true)
+    }
   }
 
   // Brand click → fresh start: drop the product and any results, keep the
@@ -593,38 +687,139 @@ export function App() {
                   )}
                 </Field>
 
-                {recent.length > 0 && !resolved && (
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-xs text-muted-foreground">
-                      Recent:
-                    </span>
-                    {recent.map((r) => (
+                {/* Recent / Watchlist tabs — shown on home screen before product is resolved */}
+                {!resolved && (recent.length > 0 || watchlist.length > 0) && (
+                  <div className="flex flex-col gap-2">
+                    {/* Tab switcher */}
+                    <div className="flex items-center gap-1">
                       <button
                         type="button"
-                        key={r.pvid}
-                        onClick={() => setLinkText(r.link)}
-                        className="flex min-h-8 items-center gap-2 rounded-full border bg-card py-1 pr-3 pl-1 text-xs transition-colors hover:bg-muted/50"
+                        onClick={() => setHomeTab("recent")}
+                        className={`text-xs px-2 py-0.5 rounded-full transition-colors ${
+                          homeTab === "recent"
+                            ? "bg-muted font-medium text-foreground"
+                            : "text-muted-foreground hover:text-foreground"
+                        }`}
                       >
-                        {r.image_url && (
-                          <img
-                            src={r.image_url}
-                            alt=""
-                            className="size-6 rounded-full border object-cover"
-                          />
-                        )}
-                        <span className="max-w-36 truncate">
-                          {r.name ?? "Product"}
-                        </span>
+                        Recent
                       </button>
-                    ))}
+                      <button
+                        type="button"
+                        onClick={() => setHomeTab("watchlist")}
+                        className={`flex items-center gap-1 text-xs px-2 py-0.5 rounded-full transition-colors ${
+                          homeTab === "watchlist"
+                            ? "bg-muted font-medium text-foreground"
+                            : "text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        <HugeiconsIcon icon={Bookmark01Icon} className="w-3 h-3" />
+                        Watchlist
+                        {watchlist.length > 0 && (
+                          <span className="ml-0.5 bg-primary text-primary-foreground text-[10px] rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                            {watchlist.length}
+                          </span>
+                        )}
+                      </button>
+                    </div>
+
+                    {/* Recent chips */}
+                    {homeTab === "recent" && recent.length > 0 && (
+                      <div className="flex flex-wrap gap-2">
+                        {recent.map((r) => (
+                          <button
+                            type="button"
+                            key={r.pvid}
+                            onClick={() => setLinkText(r.link)}
+                            className="flex min-h-8 items-center gap-2 rounded-full border bg-card py-1 pr-3 pl-1 text-xs transition-colors hover:bg-muted/50"
+                          >
+                            {r.image_url ? (
+                              <img
+                                src={r.image_url}
+                                alt=""
+                                className="size-6 rounded-full border object-cover"
+                              />
+                            ) : (
+                              <span className="size-6 rounded-full bg-muted flex items-center justify-center text-[10px] font-bold text-muted-foreground uppercase">
+                                {(r.platform ?? "?")[0]}
+                              </span>
+                            )}
+                            <span className="max-w-36 truncate">
+                              {r.name ?? extractNameFromUrl(r.link) ?? "Product"}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Watchlist chips */}
+                    {homeTab === "watchlist" && (
+                      <div className="flex flex-col gap-2">
+                        {watchlist.length === 0 ? (
+                          <p className="text-xs text-muted-foreground py-1">
+                            No watchlist items yet — search a product and tap the bookmark icon to save it.
+                          </p>
+                        ) : (
+                          <div className="flex flex-wrap gap-2">
+                            {watchlist.map((w) => (
+                              <div key={w.pvid} className="flex items-center gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => setLinkText(w.link)}
+                                  className="flex min-h-8 items-center gap-2 rounded-full border bg-card py-1 pr-3 pl-1 text-xs transition-colors hover:bg-muted/50"
+                                >
+                                  {w.image_url ? (
+                                    <img
+                                      src={w.image_url}
+                                      alt=""
+                                      className="size-6 rounded-full border object-cover"
+                                    />
+                                  ) : (
+                                    <span className="size-6 rounded-full bg-muted flex items-center justify-center text-[10px] font-bold text-muted-foreground uppercase">
+                                      {(w.platform ?? "?")[0]}
+                                    </span>
+                                  )}
+                                  <span className="max-w-36 truncate">{w.name}</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => removeFromWatchlist(w.pvid)}
+                                  title="Remove from watchlist"
+                                  className="flex size-6 items-center justify-center rounded-full text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                                >
+                                  <HugeiconsIcon icon={Cancel01Icon} className="w-3 h-3" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
 
                 {product && (
                   <>
                     <Separator />
-                    <div className="flex items-center gap-2 animate-in fade-in-0 slide-in-from-bottom-1">
+                    <div className="flex items-center justify-between gap-2 animate-in fade-in-0 slide-in-from-bottom-1">
                       <PlatformBadge platform={platformName} size="md" />
+                      {resolved && (
+                        <button
+                          type="button"
+                          onClick={toggleWatchlist}
+                          title={isInWatchlist(resolved.pvid) ? "Remove from watchlist" : "Add to watchlist"}
+                          className={`flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border transition-colors ${
+                            isInWatchlist(resolved.pvid)
+                              ? "bg-primary/10 text-primary border-primary/20 hover:bg-primary/20"
+                              : "text-muted-foreground border-border hover:bg-muted/50"
+                          }`}
+                        >
+                          <HugeiconsIcon
+                            icon={isInWatchlist(resolved.pvid) ? Bookmark01Icon : BookmarkAdd01Icon}
+                            className="w-3.5 h-3.5"
+                          />
+                          {isInWatchlist(resolved.pvid) ? "Saved" : "Watchlist"}
+                        </button>
+                      )}
                     </div>
                     <Item
                       size="sm"
@@ -798,7 +993,7 @@ export function App() {
             {/* Results Area */}
             {showResults && (
               <>
-                <div className="flex flex-col gap-2 mt-4">
+                <div className="flex flex-col gap-2 mt-4 pb-24">
                   <div className="flex items-center justify-between">
                     <p className="text-sm font-medium">
                       {sortedResults.length > 0 ? (
@@ -845,6 +1040,14 @@ export function App() {
                       Guest prices — the actual app may show different prices
                       for logged-in or subscription users.
                     </p>
+                  )}
+
+                  {/* Store click hint — shown until user clicks a store */}
+                  {sortedResults.length > 0 && !storeHintSeen && (
+                    <div className="flex items-center gap-1.5 mt-1 px-2 py-1.5 rounded-lg bg-muted/60 text-xs text-muted-foreground animate-in fade-in-0">
+                      <HugeiconsIcon icon={InformationCircleIcon} className="w-3.5 h-3.5 shrink-0" />
+                      <span>Tap any store to get its precise address for ordering</span>
+                    </div>
                   )}
                   
                   {/* Results List */}
