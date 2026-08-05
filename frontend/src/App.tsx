@@ -475,7 +475,7 @@ export function App() {
 
   return (
     <div className="min-h-screen bg-[#f9fafb] dark:bg-background flex flex-col font-sans selection:bg-primary/20">
-      <Navbar />
+      <Navbar onLogoClick={resetToStart} />
 
       <main className="flex-1 w-full max-w-screen-2xl mx-auto flex flex-col">
         {locked ? (
@@ -987,8 +987,8 @@ export function App() {
         )}
       </main>
 
-      {/* ── FAQ Section ─────────────────────────────────────────────── */}
-      {!locked && (
+      {/* ── FAQ Section — only shown on home screen, not during/after search ── */}
+      {!locked && !resolved && !linkText && (
         <section className="w-full max-w-3xl mx-auto px-4 md:px-6 pb-24 mt-4">
           <h2 className="text-sm font-semibold text-muted-foreground mb-3 uppercase tracking-wide">Frequently Asked Questions</h2>
           <Accordion

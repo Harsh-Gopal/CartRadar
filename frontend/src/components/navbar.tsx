@@ -56,16 +56,26 @@ const PLATFORM_DOTS = [
   { label: "Blinkit", color: "#E8B007" },
 ];
 
-export function Navbar() {
+interface NavbarProps {
+  /** Called when the user clicks the Cart Radar brand — typically resets the app to home state. */
+  onLogoClick?: () => void;
+}
+
+export function Navbar({ onLogoClick }: NavbarProps) {
   const { theme, setTheme } = useTheme();
 
   return (
     <nav className="sticky top-0 z-50 w-full border-b border-border/50 bg-background/85 backdrop-blur-xl">
       <div className="mx-auto flex h-14 max-w-screen-xl items-center justify-between px-5">
-        {/* Brand */}
-        <div className="flex items-center gap-2.5">
+        {/* Brand — clicking resets to home */}
+        <button
+          type="button"
+          onClick={onLogoClick}
+          className="flex items-center gap-2.5 rounded-md px-1 py-1 hover:opacity-80 transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
+          aria-label="Cart Radar — go to home"
+        >
           <RadarLogo size={24} />
-          <div className="flex flex-col leading-none">
+          <div className="flex flex-col leading-none text-left">
             <span className="font-bold text-[15px] tracking-tight text-foreground">
               Cart Radar
             </span>
@@ -73,7 +83,7 @@ export function Navbar() {
               Find it near you
             </span>
           </div>
-        </div>
+        </button>
 
         {/* Center – platform dots (desktop) */}
         <div className="hidden md:flex items-center gap-4">
@@ -95,7 +105,7 @@ export function Navbar() {
         {/* Right */}
         <div className="flex items-center gap-2">
           <a
-            href="https://github.com/Harsh-Gopal/CartRadar"
+            href="https://github.com/Harsh-Gopal/CartRadar#-how-to-use"
             target="_blank"
             rel="noopener noreferrer"
             className="hidden sm:inline-flex items-center gap-1 text-[12px] text-muted-foreground hover:text-foreground transition-colors px-3 py-1.5 rounded-md hover:bg-muted"

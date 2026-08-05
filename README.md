@@ -41,37 +41,52 @@ Instead of just checking your nearest store, Cart Radar performs a **hex-grid sw
 
 ## 🚀 Getting Started
 
-### Prerequisites
-- Python 3.11+
-- Node.js 20+
-- [uv](https://github.com/astral-sh/uv) (Python package manager)
+> 📖 **Full step-by-step guide (all OS, troubleshooting):** [`docs/RUNNING.md`](docs/RUNNING.md)
 
-### 1. Clone the repository
+### Prerequisites
+
+| Tool | Install |
+|---|---|
+| **git** | Pre-installed on most systems |
+| **uv** | `brew install uv` / [astral.sh/uv](https://astral.sh/uv) |
+| **Node.js 20+ & pnpm** | `brew install node pnpm` / [pnpm.io](https://pnpm.io) |
+
+You don't need to install Python — `uv` handles that.
+
+### Clone
 
 ```bash
 git clone https://github.com/Harsh-Gopal/CartRadar.git
 cd CartRadar/cart-radar
 ```
 
-### 2. Start the backend
+### Start everything (one command)
 
+```bash
+./dev.sh
+```
+
+This starts the **FastAPI backend** (port 8000) and the **Vite dev frontend** (port 5173) together. Press Ctrl+C to stop both.
+
+Open **[http://localhost:5173](http://localhost:5173)** when ready.
+
+<details>
+<summary>Manual start (Windows or two separate terminals)</summary>
+
+**Backend:**
 ```bash
 cd backend
 uv sync
-DEV_MODE=true uv run uvicorn app.main:app --port 8001 --reload
+DEV_MODE=true ENABLED_PLATFORMS=zepto,swiggy,bigbasket,blinkit,bbnow uv run uvicorn app.main:app --port 8000 --reload
 ```
 
-### 3. Start the frontend
-
+**Frontend:**
 ```bash
 cd frontend
-npm install
-npm run dev
+pnpm install
+pnpm dev
 ```
-
-### 4. Open in browser
-
-Navigate to [http://localhost:5173](http://localhost:5173)
+</details>
 
 ---
 
@@ -172,6 +187,37 @@ See [`docs/BUGS.md`](docs/BUGS.md) for the full bug tracker and [`docs/AUDIT_REP
 - [ ] Tata Neu / Flipkart Minutes / Amazon Fresh integration
 - [ ] Automated test suite (pytest for backend, Vitest for frontend)
 - [ ] Open Graph / SEO meta tags
+
+---
+
+## 🔮 Future Development
+
+Cart Radar is under active development. Here's what's planned next — contributions welcome!
+
+### Platform Expansion
+- **Tata Neu Grocery / BB Now sweep** — Scaffolding in place; needs anti-bot bypass for full geographic sweep
+- **Amazon Fresh** — Pincode-based availability check (API reverse-engineering in progress)
+- **Flipkart Minutes** — Early-stage research; aggressive WAF
+
+### Performance
+- **Code-split JS bundle** — Leaflet and the map panel are lazy-loaded to cut initial load from ~580KB → ~200KB
+- **Blinkit native API** — Replace Playwright-based scraping with a native HTTP client for 10× faster sweeps
+- **Parallel platform sweep** — Run all platforms simultaneously for a single product link
+
+### Features
+- **Price history** — Track price changes over time using the existing SQLite store cache
+- **Shareable search links** — Deep-link to a pre-filled search with product + location encoded in the URL
+- **Restock alerts** — Push notifications (via Web Push API) when an out-of-stock item becomes available
+- **PWA / installable** — Add manifest and service worker for offline support and home-screen install
+
+### Infrastructure
+- **CORS via environment variable** — Remove hardcoded localhost origin so any deployment domain works
+- **Persistent rate limits** — Move from in-memory to SQLite-backed limits to survive server restarts
+- **Docker Compose** — Single `docker compose up` for full-stack local development
+
+### Developer Experience
+- **Automated test suite** — pytest for backend platform clients + Vitest for frontend components
+- **CI/CD pipeline** — GitHub Actions for lint + test on every PR
 
 ---
 
