@@ -235,13 +235,13 @@ class ZeptoClient(PlatformClient):
     async def resolve_store(self, lat: float, lng: float, product_id: str | None = None) -> StoreResolution:
         await self._ensure_session()
         if getattr(self, "_is_blocked", False):
-            log.warning("Zepto is blocked; falling back to SAMPLE_STORE_ID for store resolution.")
+            log.warning("Zepto is WAF-blocked at this location; returning non-serviceable so no fake store appears.")
             return StoreResolution(
-                serviceable=True,
-                store_id=SAMPLE_STORE_ID,
-                store_name="Sample Store (Fallback)",
-                city="Unknown",
-                eta_minutes=15
+                serviceable=False,
+                store_id=None,
+                store_name=None,
+                city=None,
+                eta_minutes=None,
             )
 
         position = quote(

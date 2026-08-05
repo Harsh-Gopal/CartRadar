@@ -1,4 +1,4 @@
-import { formatPrice, getPlatformFromId } from "./results-list"
+import { formatPrice, getPlatformFromResult } from "./results-list"
 import { type StoreResult } from "@/lib/api"
 import { PlatformBadge } from "./platform-badge"
 
@@ -16,7 +16,7 @@ export function PriceSummary({ results }: PriceSummaryProps) {
   const max = Math.max(...prices)
   const avg = prices.reduce((a, b) => a + b, 0) / prices.length
   
-  const bestPlatforms = Array.from(new Set(inStock.filter(r => r.price === min).map(r => getPlatformFromId(r.store.id))))
+  const bestPlatforms = Array.from(new Set(inStock.filter(r => r.price === min).map(r => getPlatformFromResult(r))))
 
   return (
     <div className="flex items-center justify-between gap-4 rounded-xl bg-gradient-to-br from-card to-muted/20 border border-black/5 dark:border-white/5 px-4 py-3 shadow-sm mb-4 animate-in fade-in slide-in-from-bottom-2">

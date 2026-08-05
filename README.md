@@ -24,6 +24,44 @@ Instead of just checking your nearest store, Cart Radar performs a **hex-grid sw
 
 ---
 
+## 📸 Screenshots
+
+<table>
+  <tr>
+    <td align="center" width="50%">
+      <a href="docs/screenshots/home.png" title="Home screen — paste a product link to begin">
+        <img src="docs/screenshots/home.png" alt="Cart Radar home screen" width="100%" />
+      </a>
+      <br /><sub><b>Home Screen</b> — paste any product link to begin</sub>
+    </td>
+    <td align="center" width="50%">
+      <a href="docs/screenshots/product_resolved.png" title="Product resolved with Zepto store sweep across Chandigarh">
+        <img src="docs/screenshots/product_resolved.png" alt="Product resolved and stores loading on map" width="100%" />
+      </a>
+      <br /><sub><b>Product Resolved</b> — auto-detects platform, sweeps stores on map</sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" width="50%">
+      <a href="docs/screenshots/results_map.png" title="Live search results for an Instamart product in Lucknow">
+        <img src="docs/screenshots/results_map.png" alt="Search results with store map" width="100%" />
+      </a>
+      <br /><sub><b>Live Results</b> — store list + map with stock and prices</sub>
+    </td>
+    <td align="center" width="50%">
+      <a href="docs/screenshots/stores_list.png" title="Nearby Zepto stores in SAS Nagar with stock status">
+        <img src="docs/screenshots/stores_list.png" alt="Stores list with stock status and distances" width="100%" />
+      </a>
+      <br /><sub><b>Stores List</b> — per-store stock, price, and distance at a glance</sub>
+    </td>
+  </tr>
+</table>
+
+> 🎬 **Want to see it in action?** Run `./dev.sh` locally and search for any product — the real-time sweep is best experienced live.
+
+---
+
+
 ## 🛒 Supported Platforms
 
 | Platform | Stock Check | Area Sweep | Notes |

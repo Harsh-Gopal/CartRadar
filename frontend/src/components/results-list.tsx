@@ -41,6 +41,24 @@ export function formatPrice(price: number): string {
   return price % 1 === 0 ? price.toFixed(0) : price.toFixed(2)
 }
 
+/**
+ * Derives the platform from a store result.
+ * Prefers the explicit `platform` field emitted by the backend SSE event.
+ * Falls back to ID-based heuristics only when the field is absent (legacy).
+ */
+export function getPlatformFromResult(r: StoreResult): string {
+  // Use the authoritative platform field from the SSE event if available
+  if (r.platform) return r.platform
+  // Legacy fallback: infer from store ID patterns
+  const id = r.store.id
+  if (id.startsWith("bb_") || id.startsWith("bb-")) return "bigbasket"
+  if (id.startsWith("blinkit_")) return "blinkit"
+  if (id.startsWith("swiggy_")) return "swiggy"
+  if (/^\d+$/.test(id)) return "swiggy"
+  return "zepto"
+}
+
+/** @deprecated Use getPlatformFromResult(r) instead of getPlatformFromId(id). */
 export function getPlatformFromId(id: string): string {
   if (id.startsWith("bb_") || id.startsWith("bb-")) return "bigbasket"
   if (id.startsWith("blinkit_")) return "blinkit"
@@ -92,7 +110,7 @@ function StoreListItem({
       >
         <ItemContent>
           <ItemTitle className="flex items-center gap-1.5 flex-wrap">
-            <PlatformBadge platform={getPlatformFromId(r.store.id)} size="sm" />
+            <PlatformBadge platform={getPlatformFromResult(r)} size="sm" />
             <span>{prettyStoreName(r.store.name)}</span>
             {r.store.id === cheapestId && (
               <Badge
