@@ -73,10 +73,10 @@ Instead of just checking your nearest store, Cart Radar performs a **hex-grid sw
 </table>
 
 ### 🎬 Demo Video
-https://github.com/user-attachments/assets/4c59e5bc-38eb-403c-95b5-1d6b10ada9b0
+
 <video src="https://github.com/user-attachments/assets/4c59e5bc-38eb-403c-95b5-1d6b10ada9b0" controls width="100%" style="max-width:900px;border-radius:12px;" title="Cart Radar — demo searching for a product across Zepto, Instamart and BigBasket stores"></video>
 
-> _Can't play the video? Download [docs/demo.mp4](docs/demo.mp4) or [run it locally](docs/RUNNING.md) to try it yourself._
+> _Can't play the video? View or download it directly from [GitHub](https://github.com/user-attachments/assets/4c59e5bc-38eb-403c-95b5-1d6b10ada9b0)._
 
 ---
 
