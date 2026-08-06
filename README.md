@@ -17,6 +17,18 @@
 > [!NOTE]
 > **This project is in active development.** You may occasionally encounter bugs, slow responses, or unavailable platform data — quick-commerce APIs change frequently and some platforms block automated access. If something breaks, wait a moment and try again, or [open an issue](https://github.com/Harsh-Gopal/CartRadar/issues). Contributions and bug reports are welcome!
 
+> [!IMPORTANT]
+> **Educational / Personal Project — Legal Disclaimer**
+>
+> Cart Radar is an independent, **non-commercial, open-source** project created for **educational and personal learning purposes only**.
+>
+> - It is **not affiliated with, endorsed by, or associated with** Zepto, Swiggy, BigBasket, Blinkit, Tata Neu, or any other platform.
+> - It accesses publicly available product and availability data through the same API endpoints that the platforms' own websites use — no credentials, subscriptions, or private access are involved.
+> - Using automated tools to access platform APIs may be **against the Terms of Service** of the respective platforms. By running this project, you accept full responsibility for complying with the terms of the platforms you query.
+> - This tool is **not intended for commercial use, data scraping at scale, or any activity that harms the platforms**.
+>
+> If you represent one of these platforms and have concerns, please [open an issue](https://github.com/Harsh-Gopal/CartRadar/issues) or contact directly.
+
 ---
 
 ## ✨ What is Cart Radar?
@@ -60,7 +72,11 @@ Instead of just checking your nearest store, Cart Radar performs a **hex-grid sw
   </tr>
 </table>
 
-> 🎬 **Want to see it in action?** Run `./dev.sh` locally and search for any product — the real-time sweep is best experienced live.
+### 🎬 Demo Video
+
+<video src="docs/demo.mp4" controls width="100%" style="max-width:900px;border-radius:12px;" title="Cart Radar — demo searching for a product across Zepto, Instamart and BigBasket stores"></video>
+
+> _Can't play the video? Download [docs/demo.mp4](docs/demo.mp4) or [run it locally](docs/RUNNING.md) to try it yourself._
 
 ---
 

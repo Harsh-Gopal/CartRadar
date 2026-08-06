@@ -250,9 +250,6 @@ export function App() {
     () => load("mf.watchlist") ?? []
   )
   const [homeTab, setHomeTab] = useState<"recent" | "watchlist">("recent")
-  const [storeHintSeen, setStoreHintSeen] = useState<boolean>(
-    () => load("mf.hint_seen") ?? false
-  )
   const [coords, setCoordsState] = useState<GeocodeResponse | null>(() =>
     load("mf.coords")
   )
@@ -526,10 +523,6 @@ export function App() {
   function handleSelect(result: StoreResult) {
     setSelectedId(result.store.id)
     setDetail(result)
-    if (!storeHintSeen) {
-      setStoreHintSeen(true)
-      save("mf.hint_seen", true)
-    }
   }
 
   // Brand click → fresh start: drop the product and any results, keep the
@@ -1042,9 +1035,9 @@ export function App() {
                     </p>
                   )}
 
-                  {/* Store click hint — shown until user clicks a store */}
-                  {sortedResults.length > 0 && !storeHintSeen && (
-                    <div className="flex items-center gap-1.5 mt-1 px-2 py-1.5 rounded-lg bg-muted/60 text-xs text-muted-foreground animate-in fade-in-0">
+                  {/* Store click hint — always visible while results are shown */}
+                  {sortedResults.length > 0 && (
+                    <div className="flex items-center gap-1.5 mt-1 px-2 py-1.5 rounded-lg bg-muted/60 text-xs text-muted-foreground">
                       <HugeiconsIcon icon={InformationCircleIcon} className="w-3.5 h-3.5 shrink-0" />
                       <span>Tap any store to get its precise address for ordering</span>
                     </div>

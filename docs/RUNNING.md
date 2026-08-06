@@ -102,6 +102,19 @@ This single script:
 
 Press **Ctrl+C** to stop both services.
 
+> #### 🎭 First-time Blinkit support (Playwright)
+> Blinkit searches use a headless Chromium browser via Playwright. On first run
+> you need to download the browser binary **once**:
+> ```bash
+> cd backend
+> uv run playwright install chromium
+> cd ..
+> ```
+> This installs Chromium into the uv virtualenv — the correct way when using
+> `uv`. Don't use a global `playwright install`; it may install to a different
+> path than what the backend expects. After this one-time step, Blinkit results
+> will appear automatically.
+
 ---
 
 ### 🪟 Windows (manual steps)
@@ -158,6 +171,8 @@ with HTTP 403 / empty results.
 | Port 5173 already in use | Stop the other process: `lsof -ti:5173 \| xargs kill` |
 | Searches return "Not found" | Check you're on an Indian IP (see proxy section above) |
 | BigBasket shows no results | BigBasket has Akamai bot protection — try with `PROXY_URL` set |
+| Blinkit: `Executable doesn't exist` | Run `cd backend && uv run playwright install chromium` |
+| Blinkit: browser slow / crashes | Playwright headless Chromium needs ~512 MB RAM to launch cleanly |
 
 ---
 
