@@ -114,7 +114,12 @@ export function getConfig() {
 async function request<T>(input: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers)
   if (token) headers.set("X-App-Token", token)
-  const res = await fetch(input, { ...init, headers })
+  
+  // Use VITE_API_URL if defined (useful for separate frontend/backend deployments)
+  const baseUrl = import.meta.env.VITE_API_URL || ""
+  const url = input.startsWith("/") ? `${baseUrl}${input}` : input
+  
+  const res = await fetch(url, { ...init, headers })
   if (!res.ok) {
     let detail = `HTTP ${res.status}`
     try {

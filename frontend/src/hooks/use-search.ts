@@ -73,7 +73,8 @@ export function useSearch() {
         radius_km: String(radiusKm),
         force: force ? "true" : "false",
       })
-      const source = new EventSource(`/api/search?${qs}${tokenQuery()}`)
+      const baseUrl = import.meta.env.VITE_API_URL || ""
+      const source = new EventSource(`${baseUrl}/api/search?${qs}${tokenQuery()}`)
       sourceRef.current = source
       source.onmessage = (msg) => {
         const event = JSON.parse(msg.data)
