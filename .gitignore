@@ -1,0 +1,11 @@
+backend/app/__pycache__
+*.db-wal
+*.db-shm
+.DS_Store
+*.mov
+*.mp4
+*.db
+*.db-wal
+*.db-shm
+__pycache__/
+*.pyc

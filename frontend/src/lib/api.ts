@@ -196,7 +196,8 @@ export const PLATFORM_LABELS: Record<string, string> = {
 export function detectPlatformFromUrl(url: string): string | null {
   const lower = url.toLowerCase()
   if (lower.includes("zepto.com") || lower.includes("zeptonow.com")) return "zepto"
-  if (lower.includes("swiggy.com")) return "swiggy"
+  // instamart.in is Swiggy's dedicated share/deep-link domain for Instamart
+  if (lower.includes("swiggy.com") || lower.includes("instamart.in")) return "swiggy"
   if (lower.includes("bbnow.bigbasket.com")) return "bbnow"
   if (lower.includes("bigbasket.com") || lower.includes("bb.com")) return "bigbasket"
   if (lower.includes("blinkit.com") || lower.includes("grofers.com")) return "blinkit"
