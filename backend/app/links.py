@@ -16,7 +16,8 @@ UUID_RE = re.compile(UUID)
 # -- Platform host mappings ------------------------------------------------
 PLATFORM_HOSTS: dict[str, tuple[str, ...]] = {
     "zepto": ("zepto.com", "zeptonow.com", "zepto.app.link"),
-    "swiggy": ("swiggy.com",),
+    # instamart.in is Swiggy's dedicated Instamart short domain (share links use it)
+    "swiggy": ("swiggy.com", "instamart.in"),
     # BB Now MUST come before bigbasket — bbnow.bigbasket.com would otherwise
     # match bigbasket's endswith(".bigbasket.com") check first.
     "bbnow": ("bbnow.bigbasket.com",),
@@ -25,10 +26,19 @@ PLATFORM_HOSTS: dict[str, tuple[str, ...]] = {
 }
 
 # -- Per-platform product ID regexes ----------------------------------------
-# Swiggy Instamart: /instamart/item/{alphanumeric_id}
-# and canonical SEO links like /instamart/p/{slug}-{alphanumeric_id}
-# and share links like /stores/instamart/item/{alphanumeric_id}
-SWIGGY_PRODUCT_RE = re.compile(r"/(?:stores/)?instamart/(?:item|p)/(?:.*-)?([A-Za-z0-9_-]+)(?:[/?#]|$)")
+# Swiggy Instamart product URL patterns:
+#   swiggy.com:   /instamart/item/{id}  or  /instamart/p/{slug}-{id}
+#                 /stores/instamart/item/{id}
+#   instamart.in: /item/{id}?share=true  or  /p/{slug}-{id}
+# We use two patterns and pick whichever matches.
+SWIGGY_PRODUCT_RE = re.compile(
+    r"/(?:stores/)?instamart/(?:item|p)/(?:.*-)?([A-Za-z0-9_-]+)(?:[/?#]|$)"
+)
+# instamart.in short-links: https://instamart.in/item/{ID}?share=true
+#                           https://instamart.in/p/{slug}-{ID}
+INSTAMART_SHORT_RE = re.compile(
+    r"instamart\.in/(?:item|p)/(?:.*-)?([A-Za-z0-9]{6,})(?:[/?#]|$)"
+)
 # BigBasket product URL: /pd/{product_id}/{slug}/
 BB_PRODUCT_RE = re.compile(r"/pd/(\d+)(?:[/?#]|$)")
 # Blinkit: /pr/{slug}/prid/{numeric_id}
@@ -65,7 +75,8 @@ def extract_product_id(text: str) -> tuple[str | None, str | None]:
         pid = _extract_zepto_id(text)
         return ("zepto", pid) if pid else (None, None)
     elif platform == "swiggy":
-        m = SWIGGY_PRODUCT_RE.search(text)
+        # Try swiggy.com path pattern first, then instamart.in short-link pattern
+        m = SWIGGY_PRODUCT_RE.search(text) or INSTAMART_SHORT_RE.search(text)
         return ("swiggy", m.group(1)) if m else ("swiggy", None)
     elif platform == "bigbasket":
         m = BB_PRODUCT_RE.search(text)

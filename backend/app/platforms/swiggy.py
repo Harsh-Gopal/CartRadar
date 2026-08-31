@@ -257,8 +257,9 @@ class SwiggyClient(PlatformClient):
         pass
 
     async def resolve_share_link(self, url: str) -> str | None:
-        from ..links import SWIGGY_PRODUCT_RE
-        m = SWIGGY_PRODUCT_RE.search(url)
+        from ..links import SWIGGY_PRODUCT_RE, INSTAMART_SHORT_RE
+        # Try both swiggy.com and instamart.in URL patterns
+        m = SWIGGY_PRODUCT_RE.search(url) or INSTAMART_SHORT_RE.search(url)
         return m.group(1) if m else None
 
     async def resolve_store(

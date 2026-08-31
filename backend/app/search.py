@@ -115,6 +115,14 @@ async def run_search(
         home = await client.resolve_store(lat, lng, product_id=product_id)
         home_product = None
         home_eta = home.eta_minutes
+        
+        # Detect WAF/block condition: not serviceable with no error means WAF
+        zepto_waf_blocked = (
+            platform == "zepto" and
+            not home.serviceable and
+            not home.store_id
+        )
+        
         if home.serviceable and home.store_id:
             checked.add(home.store_id)
             cache.record_probe(lat, lng, home.store_id, home.store_name, home.city, platform)
@@ -137,6 +145,13 @@ async def run_search(
                 "product": asdict(home_product) if home_product else None,
             }
         )
+        
+        # If WAF-blocked, emit a notice so the user understands results may be from cache only
+        if zepto_waf_blocked:
+            await emit({
+                "type": "notice",
+                "message": "Zepto's anti-bot protection is active — showing results from previously discovered stores. Results may not reflect current stock.",
+            })
 
         # Always emit a store_result for the home store so it appears in the
         # map and stores list. Without this, cities/areas with only one dark
@@ -170,37 +185,46 @@ async def run_search(
         for store in cache.stores_within(lat, lng, radius_km, platform):
             start_check(store)
 
-        # 3. Sweep undiscovered area
-        undiscovered = [
-            p
-            for p in hex_grid(lat, lng, radius_km, GRID_SPACING_KM)
-            if not cache.has_fresh_probe_near(p[0], p[1], PROBE_COVERAGE_KM, platform)
-        ]
-        if probe_budget is not None:
-            granted = probe_budget.take_up_to(len(undiscovered))
-        else:
-            granted = len(undiscovered)
-        to_probe = undiscovered[:granted]
-        budget_limited = granted < len(undiscovered)
-
-        progress = {"probed": 0, "failed": 0, "total": len(to_probe)}
-        await emit(
-            {
+        # 3. Sweep undiscovered area (skip if WAF-blocked since probes will all fail)
+        if zepto_waf_blocked:
+            # Can't discover new stores — emit discovery_start with 0 probes so UI progresses
+            await emit({
                 "type": "discovery_start",
-                "points_to_probe": len(to_probe),
+                "points_to_probe": 0,
                 "cached_stores": counts["stores"],
-            }
-        )
-        if budget_limited:
-            log.warning("probe budget limited sweep: %d/%d points", granted, len(undiscovered))
+            })
+        else:
+            undiscovered = [
+                p
+                for p in hex_grid(lat, lng, radius_km, GRID_SPACING_KM)
+                if not cache.has_fresh_probe_near(p[0], p[1], PROBE_COVERAGE_KM, platform)
+            ]
+            if probe_budget is not None:
+                granted = probe_budget.take_up_to(len(undiscovered))
+            else:
+                granted = len(undiscovered)
+            to_probe = undiscovered[:granted]
+            budget_limited = granted < len(undiscovered)
+
+            progress = {"probed": 0, "failed": 0, "total": len(to_probe)}
             await emit(
                 {
-                    "type": "notice",
-                    "message": "Daily store-mapping limit reached — some far stores may be missing.",
+                    "type": "discovery_start",
+                    "points_to_probe": len(to_probe),
+                    "cached_stores": counts["stores"],
                 }
             )
-        if to_probe:
-            await asyncio.gather(*(probe_point(p[0], p[1], progress) for p in to_probe))
+            if budget_limited:
+                log.warning("probe budget limited sweep: %d/%d points", granted, len(undiscovered))
+                await emit(
+                    {
+                        "type": "notice",
+                        "message": "Daily store-mapping limit reached — some far stores may be missing.",
+                    }
+                )
+            if to_probe:
+                await asyncio.gather(*(probe_point(p[0], p[1], progress) for p in to_probe))
+
 
         await emit({"type": "checking", "total_stores": counts["stores"]})
         if check_tasks:
