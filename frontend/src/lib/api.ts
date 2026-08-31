@@ -75,13 +75,14 @@ export interface PlatformInfo {
   supports_geocoding: boolean
 }
 
-export interface DeliveryStatus {
-  is_open: boolean | null
-  always_open: boolean
-  opens_at: string | null    // "HH:MM" IST or null for 24x7
-  closes_at: string | null   // "HH:MM" IST or null for 24x7
-  notes: string
-  label: string
+/** Real-time serviceability response from /api/serviceability */
+export interface PlatformServiceability {
+  source: "live" | "timeout" | "error" | "skipped"
+  is_open: boolean | null     // true = platform delivering there right now
+  serviceable?: boolean
+  store_name?: string | null
+  city?: string | null
+  eta_minutes?: number | null
 }
 
 // -- access token ----------------------------------------------------------
@@ -120,9 +121,11 @@ export function getConfig() {
   return request<AppConfig>("/api/config")
 }
 
-export function getDeliveryHours(city?: string) {
-  const q = city ? `?city=${encodeURIComponent(city)}` : ""
-  return request<Record<string, DeliveryStatus>>(`/api/delivery-hours${q}`)
+/** Check real-time delivery availability at coordinates for all platforms. */
+export function getServiceability(lat: number, lng: number) {
+  return request<Record<string, PlatformServiceability>>(
+    `/api/serviceability?lat=${lat}&lng=${lng}`
+  )
 }
 
 /** Fire-and-forget: wake up Render from sleep before user performs a search. */

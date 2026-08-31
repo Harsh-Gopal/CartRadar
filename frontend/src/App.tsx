@@ -102,6 +102,7 @@ import { useSearch } from "@/hooks/use-search"
 import {
   detectPlatformFromUrl,
   getConfig,
+  getServiceability,
   getToken,
   pingBackend,
   PLATFORM_LABELS,
@@ -109,6 +110,7 @@ import {
   setToken,
   type AppConfig,
   type GeocodeResponse,
+  type PlatformServiceability,
   type ResolveResponse,
   type StoreResult,
 } from "@/lib/api"
@@ -264,6 +266,24 @@ export function App() {
   const [detail, setDetail] = useState<StoreResult | null>(null)
   const [view, setView] = useState<"map" | "list">("map")
   const [lastRunKey, setLastRunKey] = useState<string | null>(null)
+
+  const [serviceability, setServiceability] = useState<Record<string, PlatformServiceability> | null>(null)
+
+  // Fetch real-time serviceability whenever coordinates change
+  useEffect(() => {
+    if (!coords) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setServiceability(null)
+      return
+    }
+    let active = true
+    getServiceability(coords.lat, coords.lng)
+      .then(res => {
+        if (active) setServiceability(res)
+      })
+      .catch(err => console.error("Failed to check serviceability", err))
+    return () => { active = false }
+  }, [coords])
 
   // -- watchlist helpers --
   function isInWatchlist(pvid: string) {
@@ -801,7 +821,7 @@ export function App() {
                     <div className="flex items-center justify-between gap-2 animate-in fade-in-0 slide-in-from-bottom-1">
                       <div className="flex items-center gap-2 flex-wrap">
                         <PlatformBadge platform={platformName} size="md" />
-                        <DeliveryBadge platform={platformName} city={state.home?.city ?? null} />
+                        <DeliveryBadge platform={platformName} serviceability={serviceability?.[platformName]} loading={!serviceability} />
                       </div>
                       {resolved && (
                         <button
@@ -921,7 +941,8 @@ export function App() {
             {resolved && (
               <DeliveryWarningBanner
                 platform={platformName}
-                city={state.home?.city ?? null}
+                platformLabel={PLATFORM_LABELS[platformName]}
+                serviceability={serviceability?.[platformName]}
               />
             )}
 
@@ -1010,6 +1031,8 @@ export function App() {
                           In stock at {inStock.length} of {sortedResults.length} stores
                           {searching && " — still checking…"}
                         </>
+                      ) : state.phase === "done" ? (
+                        "No stores found"
                       ) : (
                         statusText
                       )}
@@ -1075,6 +1098,11 @@ export function App() {
                     {!searching && sortedResults.length > 0 && visibleResults.length === 0 && (
                       <p className="px-4 py-3 text-sm text-muted-foreground bg-muted rounded-xl">
                         No stores match the filter.
+                      </p>
+                    )}
+                    {!searching && sortedResults.length === 0 && (
+                      <p className="px-4 py-3 text-sm text-muted-foreground bg-muted rounded-xl">
+                        No nearby stores carry this product.
                       </p>
                     )}
                   </div>

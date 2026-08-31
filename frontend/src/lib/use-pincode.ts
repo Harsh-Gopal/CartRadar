@@ -26,7 +26,7 @@ async function fetchPincode(lat: number, lng: number): Promise<string> {
         cache.set(key, postcode);
         return postcode;
       }
-    } catch (e) {
+    } catch {
       // ignore
     }
     return "";

@@ -1,4 +1,4 @@
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 
 import L from "leaflet"
 import { Circle, CircleMarker, MapContainer, Popup, Tooltip, TileLayer, useMap } from "react-leaflet"
@@ -108,16 +108,58 @@ interface ResultsMapProps {
 export function ResultsMap({ lat, lng, radiusKm, results, homeStatus, homePrice, selectedId, searchPincode, onSelect, className }: ResultsMapProps) {
   const { resolvedTheme } = useTheme()
   const isDark = (resolvedTheme ?? "dark") === "dark"
+
+  const [mapMode, setMapMode] = useState<"simple" | "detailed">(() => {
+    try {
+      return (localStorage.getItem("mf.mapMode") as "simple" | "detailed") || "simple"
+    } catch {
+      return "simple"
+    }
+  })
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("mf.mapMode", mapMode)
+    } catch {
+      // ignore
+    }
+  }, [mapMode])
+
+  const mapFilter = mapMode === "simple"
+    ? isDark
+      ? ".leaflet-tile-pane { filter: invert(100%) hue-rotate(180deg) grayscale(100%) opacity(25%) contrast(120%) brightness(130%); }"
+      : ".leaflet-tile-pane { filter: grayscale(100%) opacity(30%) contrast(110%) brightness(110%); }"
+    : isDark
+      ? ".leaflet-tile-pane { filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%); }"
+      : ""
+
   return (
-    <MapContainer
-      center={[lat, lng]}
-      zoom={12}
-      className={cn("z-0 w-full", className || "h-72")}
-      scrollWheelZoom={false}
-    >
-      {/* Apply CSS filter on tile pane for dark mode — no API key needed */}
-      <style>{isDark ? ".leaflet-tile-pane { filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%); }" : ""}</style>
-      <TileLayer
+    <div className={cn("relative z-0 w-full", className || "h-72")}>
+      <style>{mapFilter}</style>
+      <div className="absolute top-2 right-2 z-[1000] bg-background/90 backdrop-blur-sm border rounded-lg shadow-sm text-[10px] font-medium flex overflow-hidden">
+        <button
+          onClick={(e) => { e.preventDefault(); e.stopPropagation(); setMapMode("simple") }}
+          className={cn("px-2 py-1 transition-colors", mapMode === "simple" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")}
+        >
+          Simple
+        </button>
+        <button
+          onClick={(e) => { e.preventDefault(); e.stopPropagation(); setMapMode("detailed") }}
+          className={cn("px-2 py-1 transition-colors", mapMode === "detailed" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")}
+        >
+          Detailed
+        </button>
+      </div>
+      <MapContainer
+        center={[lat, lng]}
+        zoom={12}
+        className="w-full h-full"
+        scrollWheelZoom={true}
+        touchZoom={true}
+        doubleClickZoom={true}
+        dragging={true}
+      >
+        <TileLayer
         key={resolvedTheme}
         attribution={TILE_ATTRIBUTION}
         url={TILE_URL}
@@ -163,5 +205,6 @@ export function ResultsMap({ lat, lng, radiusKm, results, homeStatus, homePrice,
         />
       ))}
     </MapContainer>
+    </div>
   )
 }

@@ -1,113 +1,88 @@
 /**
- * DeliveryBadge — shows whether a platform is currently delivering.
+ * DeliveryBadge — shows real-time delivery availability for a platform.
+ *
+ * Uses /api/serviceability (actual platform API) when coordinates are available.
+ * Falls back to showing nothing if the check hasn't completed yet.
  *
  * Usage:
- *   <DeliveryBadge platform="blinkit" city="Kharar" />
- *
- * Fetches /api/delivery-hours?city=<city> once and caches per session.
+ *   <DeliveryBadge platform="blinkit" serviceability={serviceability?.blinkit} />
  */
-import { useEffect, useState } from "react"
-import { getDeliveryHours, type DeliveryStatus } from "@/lib/api"
-
-// Module-level cache so the fetch isn't repeated on re-renders.
-const _cache: Record<string, Record<string, DeliveryStatus>> = {}
-
-function usePlatformDelivery(platform: string, city?: string | null) {
-  const cacheKey = city ? city.toLowerCase() : "__no_city__"
-  const [status, setStatus] = useState<DeliveryStatus | null>(
-    () => _cache[cacheKey]?.[platform] ?? null
-  )
-
-  useEffect(() => {
-    if (_cache[cacheKey]?.[platform]) {
-      setStatus(_cache[cacheKey][platform])
-      return
-    }
-    getDeliveryHours(city ?? undefined)
-      .then((all) => {
-        _cache[cacheKey] = all
-        setStatus(all[platform] ?? null)
-      })
-      .catch(() => {/* best-effort */})
-  }, [platform, cacheKey, city])
-
-  return status
-}
+import type { PlatformServiceability } from "@/lib/api"
 
 interface DeliveryBadgeProps {
   platform: string
-  city?: string | null
+  serviceability?: PlatformServiceability | null
+  loading?: boolean
   className?: string
 }
 
 const STATUS_STYLES = {
   open: "bg-green-500/15 text-green-600 dark:text-green-400 border-green-500/30",
   closed: "bg-red-500/15 text-red-600 dark:text-red-400 border-red-500/30",
-  always: "bg-primary/10 text-primary border-primary/20",
-  unknown: "bg-muted text-muted-foreground border-border",
+  unknown: "bg-muted/60 text-muted-foreground border-border",
+  checking: "bg-muted/60 text-muted-foreground border-border",
 }
 
-export function DeliveryBadge({ platform, city, className }: DeliveryBadgeProps) {
-  const status = usePlatformDelivery(platform, city)
-  if (!status) return null
+export function DeliveryBadge({ serviceability, loading, className }: DeliveryBadgeProps) {
+  if (loading) {
+    return (
+      <span className={`inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded border ${STATUS_STYLES.checking} ${className ?? ""}`}>
+        <span className="w-1.5 h-1.5 rounded-full bg-current opacity-40 animate-pulse" />
+        Checking delivery…
+      </span>
+    )
+  }
+
+  if (!serviceability) return null
+
+  const { is_open, source, eta_minutes, city } = serviceability
+
+  if (source === "skipped" || source === "error" || source === "timeout") return null
 
   let styleKey: keyof typeof STATUS_STYLES
   let label: string
 
-  if (status.is_open === null) {
-    styleKey = "unknown"
-    label = "Hours unknown"
-  } else if (status.always_open) {
-    styleKey = "always"
-    label = "Delivers 24×7"
-  } else if (status.is_open) {
+  if (is_open === null) {
+    return null // don't show if unknown
+  } else if (is_open) {
     styleKey = "open"
-    label = `Open until ${status.closes_at} IST`
+    label = eta_minutes ? `Delivering · ~${eta_minutes} min` : `Delivering now${city ? ` in ${city}` : ""}`
   } else {
     styleKey = "closed"
-    label = status.opens_at ? `Opens at ${status.opens_at} IST` : "Currently closed"
+    label = "Not delivering here"
   }
 
   return (
     <span
-      title={status.notes}
       className={`inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded border ${STATUS_STYLES[styleKey]} ${className ?? ""}`}
     >
-      <span className={`w-1.5 h-1.5 rounded-full ${
-        styleKey === "always" || styleKey === "open"
-          ? "bg-current animate-pulse"
-          : "bg-current opacity-50"
-      }`} />
+      <span className={`w-1.5 h-1.5 rounded-full bg-current ${is_open ? "animate-pulse" : "opacity-50"}`} />
       {label}
     </span>
   )
 }
 
 /**
- * DeliveryWarningBanner — full-width warning when searching during closed hours.
- * Only shown when the platform is definitively closed (not unknown or always-open).
+ * DeliveryWarningBanner — shown when platform is definitively NOT delivering.
+ * Uses real-time serviceability data from /api/serviceability.
  */
 interface DeliveryWarningProps {
   platform: string
-  city?: string | null
+  platformLabel: string
+  serviceability?: PlatformServiceability | null
 }
 
-export function DeliveryWarningBanner({ platform, city }: DeliveryWarningProps) {
-  const status = usePlatformDelivery(platform, city)
-
-  if (!status || status.is_open !== false || status.always_open) return null
+export function DeliveryWarningBanner({ platformLabel, serviceability }: DeliveryWarningProps) {
+  if (!serviceability) return null
+  if (serviceability.is_open !== false) return null
+  if (serviceability.source !== "live") return null
 
   return (
     <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 text-xs text-amber-700 dark:text-amber-400">
       <span className="text-base leading-none mt-0.5">⚠️</span>
       <span>
-        <strong>{status.label}</strong> is not delivering right now.
-        {status.opens_at && (
-          <> Delivery restarts at <strong>{status.opens_at} IST</strong>.</>
-        )}{" "}
-        Results may show available stock but no order can be placed.
-        <br />
-        <span className="opacity-70">{status.notes}</span>
+        <strong>{platformLabel}</strong> is currently not delivering to your selected location.
+        Stock may still be visible but no order can be placed right now.
       </span>
     </div>
   )
