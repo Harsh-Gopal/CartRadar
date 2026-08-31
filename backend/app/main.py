@@ -4,6 +4,7 @@ Routes auto-detect which platform a link belongs to and dispatch to the
 correct PlatformClient.
 """
 
+import asyncio
 import hmac
 import httpx
 import json
@@ -44,8 +45,12 @@ def _create_clients() -> dict[str, PlatformClient]:
         clients["swiggy"] = SwiggyClient(config.PROXY_URL, config.SWIGGY_CONCURRENCY)
     if "bigbasket" in config.ENABLED_PLATFORMS:
         clients["bigbasket"] = BigBasketClient(config.PROXY_URL, config.BB_CONCURRENCY)
-    if "blinkit" in config.ENABLED_PLATFORMS:
-        clients["blinkit"] = BlinkitClient(config.PROXY_URL, 5) # Default 5 concurrency
+    if "blinkit" in config.ENABLED_PLATFORMS and config.PLAYWRIGHT_ENABLED:
+        # Blinkit requires Playwright (Chromium). On Render free tier (512MB RAM),
+        # Chromium alone uses ~250MB which causes OOM. Disable via PLAYWRIGHT_ENABLED=false.
+        clients["blinkit"] = BlinkitClient(config.PROXY_URL, 5)
+    elif "blinkit" in config.ENABLED_PLATFORMS:
+        log.warning("Blinkit is in ENABLED_PLATFORMS but PLAYWRIGHT_ENABLED=false — skipping Blinkit")
     if "bbnow" in config.ENABLED_PLATFORMS:
         clients["bbnow"] = BBNowClient(config.PROXY_URL, 4)
     log.info("enabled platforms: %s", list(clients.keys()))
@@ -69,15 +74,18 @@ async def lifespan(app: FastAPI):
     app.state.probe_budget = TokenBucket(
         config.PROBE_BURST, config.PROBES_PER_DAY / 86_400
     )
+    # NOTE: Do NOT pre-warm Playwright here — Chromium uses ~250MB which causes
+    # OOM on Render free tier (512MB total). Blinkit browser launches lazily on first use.
     yield
     for client in app.state.clients.values():
         await client.aclose()
-    # Close shared Playwright browser (Blinkit)
-    try:
-        from .platforms.blinkit import _close_browser as blinkit_close
-        await blinkit_close()
-    except Exception:
-        pass
+    # Close shared Playwright browser (Blinkit) if it was started
+    if config.PLAYWRIGHT_ENABLED:
+        try:
+            from .platforms.blinkit import _close_browser as blinkit_close
+            await blinkit_close()
+        except Exception:
+            pass
     app.state.cache.close()
 
 
@@ -157,6 +165,56 @@ class ResolveRequest(BaseModel):
     url: str
     lat: float | None = None
     lng: float | None = None
+
+
+@app.get("/api/ping")
+async def ping():
+    """Liveness / wake-up endpoint. No auth required. Used by the frontend to
+    pre-warm Render from sleep before the user performs a search."""
+    return {"ok": True}
+
+
+
+@app.get("/api/serviceability", dependencies=[Depends(require_access)])
+async def check_serviceability(
+    lat: float = Query(...),
+    lng: float = Query(...),
+    request: Request = None,
+):
+    """Real-time delivery availability check at the given coordinates.
+
+    Calls each enabled platform's store-resolution API and returns live
+    serviceability — including city, ETA and whether delivery is active right now.
+    Blinkit is excluded (Playwright/browser-based, too slow for a quick check).
+    Timeout per platform: 8 s.
+    """
+    clients: dict[str, PlatformClient] = request.app.state.clients
+    results: dict = {}
+
+    async def _check(name: str, client: PlatformClient) -> None:
+        # Skip Blinkit — its resolve_store uses Playwright and is too slow/heavy
+        # for a quick availability pre-check.
+        if name == "blinkit":
+            results[name] = {"source": "skipped", "is_open": None}
+            return
+        try:
+            res = await asyncio.wait_for(client.resolve_store(lat, lng), timeout=8.0)
+            results[name] = {
+                "source": "live",
+                "is_open": res.serviceable,
+                "serviceable": res.serviceable,
+                "store_name": res.store_name,
+                "city": res.city,
+                "eta_minutes": res.eta_minutes,
+            }
+        except asyncio.TimeoutError:
+            results[name] = {"source": "timeout", "is_open": None}
+        except PlatformError as exc:
+            log.warning("serviceability check failed for %s: %s", name, exc)
+            results[name] = {"source": "error", "is_open": None}
+
+    await asyncio.gather(*[_check(n, c) for n, c in clients.items()])
+    return results
 
 
 @app.get("/api/config")

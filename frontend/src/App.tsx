@@ -96,17 +96,21 @@ import {
   prettyStoreName,
 } from "@/components/results-list"
 import { ResultsMap } from "@/components/results-map"
+ import { DeliveryBadge, DeliveryWarningBanner } from "@/components/delivery-badge"
 import { useAddressDetails } from "@/lib/use-address"
 import { useSearch } from "@/hooks/use-search"
 import {
   detectPlatformFromUrl,
   getConfig,
+  getServiceability,
   getToken,
+  pingBackend,
   PLATFORM_LABELS,
   resolveLink,
   setToken,
   type AppConfig,
   type GeocodeResponse,
+  type PlatformServiceability,
   type ResolveResponse,
   type StoreResult,
 } from "@/lib/api"
@@ -263,6 +267,24 @@ export function App() {
   const [view, setView] = useState<"map" | "list">("map")
   const [lastRunKey, setLastRunKey] = useState<string | null>(null)
 
+  const [serviceability, setServiceability] = useState<Record<string, PlatformServiceability> | null>(null)
+
+  // Fetch real-time serviceability whenever coordinates change
+  useEffect(() => {
+    if (!coords) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setServiceability(null)
+      return
+    }
+    let active = true
+    getServiceability(coords.lat, coords.lng)
+      .then(res => {
+        if (active) setServiceability(res)
+      })
+      .catch(err => console.error("Failed to check serviceability", err))
+    return () => { active = false }
+  }, [coords])
+
   // -- watchlist helpers --
   function isInWatchlist(pvid: string) {
     return watchlist.some((w) => w.pvid === pvid)
@@ -303,6 +325,9 @@ export function App() {
   const [appConfig, setAppConfig] = useState<AppConfig | null>(null)
   const [hasToken, setHasToken] = useState(() => !!getToken())
   const [tokenInput, setTokenInput] = useState("")
+
+  // Ping backend on load so Render wakes up from sleep before the user searches.
+  useEffect(() => { pingBackend() }, [])
 
   // Learn the instance's radius cap and whether it's token-gated.
   useEffect(() => {
@@ -794,7 +819,10 @@ export function App() {
                   <>
                     <Separator />
                     <div className="flex items-center justify-between gap-2 animate-in fade-in-0 slide-in-from-bottom-1">
-                      <PlatformBadge platform={platformName} size="md" />
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <PlatformBadge platform={platformName} size="md" />
+                        <DeliveryBadge platform={platformName} serviceability={serviceability?.[platformName]} loading={!serviceability} />
+                      </div>
                       {resolved && (
                         <button
                           type="button"
@@ -909,6 +937,15 @@ export function App() {
               </Card>
             )}
 
+            {/* Delivery hours warning — shown when platform is closed */}
+            {resolved && (
+              <DeliveryWarningBanner
+                platform={platformName}
+                platformLabel={PLATFORM_LABELS[platformName]}
+                serviceability={serviceability?.[platformName]}
+              />
+            )}
+
             {state.error && (
               <Alert variant="destructive">
                 <HugeiconsIcon icon={CancelCircleIcon} />
@@ -994,6 +1031,8 @@ export function App() {
                           In stock at {inStock.length} of {sortedResults.length} stores
                           {searching && " — still checking…"}
                         </>
+                      ) : state.phase === "done" ? (
+                        "No stores found"
                       ) : (
                         statusText
                       )}
@@ -1059,6 +1098,11 @@ export function App() {
                     {!searching && sortedResults.length > 0 && visibleResults.length === 0 && (
                       <p className="px-4 py-3 text-sm text-muted-foreground bg-muted rounded-xl">
                         No stores match the filter.
+                      </p>
+                    )}
+                    {!searching && sortedResults.length === 0 && (
+                      <p className="px-4 py-3 text-sm text-muted-foreground bg-muted rounded-xl">
+                        No nearby stores carry this product.
                       </p>
                     )}
                   </div>

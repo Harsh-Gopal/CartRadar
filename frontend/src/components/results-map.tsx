@@ -1,4 +1,4 @@
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 
 import L from "leaflet"
 import { Circle, CircleMarker, MapContainer, Popup, Tooltip, TileLayer, useMap } from "react-leaflet"
@@ -10,14 +10,11 @@ import { STATUS_LABEL, getPlatformFromId } from "@/components/results-list"
 import type { StoreResult } from "@/lib/api"
 import { usePincode } from "@/lib/use-pincode"
 
-// Carto basemaps track the app theme: Positron (light) / Dark Matter (dark).
-// Cleaner than default OSM tiles and they actually have a dark variant.
-const TILE_URL = {
-  light: "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
-  dark: "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
-} as const
+// OpenStreetMap tiles — free, no API key, globally available.
+// Dark mode uses a CSS filter (invert + hue-rotate) on the tile pane.
+const TILE_URL = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
 const TILE_ATTRIBUTION =
-  '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
+  '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
 
 const PLATFORM_COLORS: Record<string, string> = {
   zepto: "#8B5CF6",
@@ -110,17 +107,62 @@ interface ResultsMapProps {
 
 export function ResultsMap({ lat, lng, radiusKm, results, homeStatus, homePrice, selectedId, searchPincode, onSelect, className }: ResultsMapProps) {
   const { resolvedTheme } = useTheme()
+  const isDark = (resolvedTheme ?? "dark") === "dark"
+
+  const [mapMode, setMapMode] = useState<"simple" | "detailed">(() => {
+    try {
+      return (localStorage.getItem("mf.mapMode") as "simple" | "detailed") || "simple"
+    } catch {
+      return "simple"
+    }
+  })
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("mf.mapMode", mapMode)
+    } catch {
+      // ignore
+    }
+  }, [mapMode])
+
+  const mapFilter = mapMode === "simple"
+    ? isDark
+      ? ".leaflet-tile-pane { filter: invert(100%) hue-rotate(180deg) grayscale(100%) opacity(25%) contrast(120%) brightness(130%); }"
+      : ".leaflet-tile-pane { filter: grayscale(100%) opacity(30%) contrast(110%) brightness(110%); }"
+    : isDark
+      ? ".leaflet-tile-pane { filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%); }"
+      : ""
+
   return (
-    <MapContainer
-      center={[lat, lng]}
-      zoom={12}
-      className={cn("z-0 w-full", className || "h-72")}
-      scrollWheelZoom={false}
-    >
-      <TileLayer
+    <div className={cn("relative z-0 w-full", className || "h-72")}>
+      <style>{mapFilter}</style>
+      <div className="absolute top-2 right-2 z-[1000] bg-background/90 backdrop-blur-sm border rounded-lg shadow-sm text-[10px] font-medium flex overflow-hidden">
+        <button
+          onClick={(e) => { e.preventDefault(); e.stopPropagation(); setMapMode("simple") }}
+          className={cn("px-2 py-1 transition-colors", mapMode === "simple" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")}
+        >
+          Simple
+        </button>
+        <button
+          onClick={(e) => { e.preventDefault(); e.stopPropagation(); setMapMode("detailed") }}
+          className={cn("px-2 py-1 transition-colors", mapMode === "detailed" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")}
+        >
+          Detailed
+        </button>
+      </div>
+      <MapContainer
+        center={[lat, lng]}
+        zoom={12}
+        className="w-full h-full"
+        scrollWheelZoom={true}
+        touchZoom={true}
+        doubleClickZoom={true}
+        dragging={true}
+      >
+        <TileLayer
         key={resolvedTheme}
         attribution={TILE_ATTRIBUTION}
-        url={TILE_URL[resolvedTheme]}
+        url={TILE_URL}
       />
       <FitToRadius lat={lat} lng={lng} radiusKm={radiusKm} />
       <FlyToSelected results={results} selectedId={selectedId} />
@@ -163,5 +205,6 @@ export function ResultsMap({ lat, lng, radiusKm, results, homeStatus, homePrice,
         />
       ))}
     </MapContainer>
+    </div>
   )
 }

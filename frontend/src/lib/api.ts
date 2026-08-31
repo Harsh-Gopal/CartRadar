@@ -75,6 +75,16 @@ export interface PlatformInfo {
   supports_geocoding: boolean
 }
 
+/** Real-time serviceability response from /api/serviceability */
+export interface PlatformServiceability {
+  source: "live" | "timeout" | "error" | "skipped"
+  is_open: boolean | null     // true = platform delivering there right now
+  serviceable?: boolean
+  store_name?: string | null
+  city?: string | null
+  eta_minutes?: number | null
+}
+
 // -- access token ----------------------------------------------------------
 
 const TOKEN_KEY = "mf_token"
@@ -109,6 +119,19 @@ export function tokenQuery(): string {
 
 export function getConfig() {
   return request<AppConfig>("/api/config")
+}
+
+/** Check real-time delivery availability at coordinates for all platforms. */
+export function getServiceability(lat: number, lng: number) {
+  return request<Record<string, PlatformServiceability>>(
+    `/api/serviceability?lat=${lat}&lng=${lng}`
+  )
+}
+
+/** Fire-and-forget: wake up Render from sleep before user performs a search. */
+export function pingBackend(): void {
+  const baseUrl = import.meta.env.VITE_API_URL || ""
+  fetch(`${baseUrl}/api/ping`).catch(() => { /* ignore — best-effort */ })
 }
 
 async function request<T>(input: string, init: RequestInit = {}): Promise<T> {

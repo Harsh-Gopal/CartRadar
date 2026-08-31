@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react"
 
 import { HugeiconsIcon } from "@hugeicons/react"
-import { Gps01Icon, MapPinIcon } from "@hugeicons/core-free-icons"
+import { Gps01Icon, MapPinIcon, Clock01Icon } from "@hugeicons/core-free-icons"
 
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field"
 import {
@@ -19,6 +19,8 @@ interface LocationSearchProps {
   onCoords: (coords: GeocodeResponse | null) => void
 }
 
+const STORAGE_KEY = "cartRadar_lastLocation"
+
 export function LocationSearch({ coords, onCoords }: LocationSearchProps) {
   const [query, setQuery] = useState(coords?.label ?? "")
   const [suggestions, setSuggestions] = useState<PlaceSuggestion[]>([])
@@ -26,8 +28,26 @@ export function LocationSearch({ coords, onCoords }: LocationSearchProps) {
   const [highlight, setHighlight] = useState(0)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  
+  const [savedLocation, setSavedLocation] = useState<GeocodeResponse | null>(() => {
+    try {
+      const val = localStorage.getItem(STORAGE_KEY)
+      return val ? JSON.parse(val) : null
+    } catch {
+      return null
+    }
+  })
   const abortRef = useRef<AbortController | null>(null)
-  const skipNextFetch = useRef(false)
+  const skipNextFetch = useRef(true) // Skip fetch on initial mount so restored address doesn't trigger dropdown
+
+  useEffect(() => {
+    if (coords?.label && coords.label !== query) {
+      skipNextFetch.current = true
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setQuery(coords.label)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [coords?.label])
 
   useEffect(() => {
     if (skipNextFetch.current) {
@@ -36,6 +56,7 @@ export function LocationSearch({ coords, onCoords }: LocationSearchProps) {
     }
     const q = query.trim()
     if (q.length < 2) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSuggestions([])
       setOpen(false)
       return
@@ -63,13 +84,26 @@ export function LocationSearch({ coords, onCoords }: LocationSearchProps) {
     setBusy(true)
     setError(null)
     try {
-      onCoords(await placeDetails(s.place_id, s.description))
+      const details = await placeDetails(s.place_id, s.description)
+      onCoords(details)
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(details))
+        setSavedLocation(details)
+      } catch { /* ignore */ }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't locate that place.")
       onCoords(null)
     } finally {
       setBusy(false)
     }
+  }
+
+  function useSavedLocation() {
+    if (!savedLocation) return
+    skipNextFetch.current = true
+    setQuery(savedLocation.label)
+    setOpen(false)
+    onCoords(savedLocation)
   }
 
   function useGps() {
@@ -84,11 +118,16 @@ export function LocationSearch({ coords, onCoords }: LocationSearchProps) {
         skipNextFetch.current = true
         setQuery("Current location (GPS)")
         setOpen(false)
-        onCoords({
+        const newCoords = {
           lat: pos.coords.latitude,
           lng: pos.coords.longitude,
           label: "Current location (GPS)",
-        })
+        }
+        onCoords(newCoords)
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(newCoords))
+          setSavedLocation(newCoords)
+        } catch { /* ignore */ }
         setBusy(false)
       },
       () => {
@@ -130,6 +169,7 @@ export function LocationSearch({ coords, onCoords }: LocationSearchProps) {
             aria-invalid={error ? true : undefined}
             autoComplete="off"
             onChange={(e) => {
+              skipNextFetch.current = false
               setQuery(e.target.value)
               onCoords(null)
               setError(null)
@@ -188,6 +228,22 @@ export function LocationSearch({ coords, onCoords }: LocationSearchProps) {
         <FieldDescription>Searching around: {coords.label}</FieldDescription>
       ) : (
         <FieldDescription>Pick a suggestion or tap the GPS button.</FieldDescription>
+      )}
+
+      {!coords && savedLocation && !query && (
+        <button
+          type="button"
+          onClick={useSavedLocation}
+          className="mt-2 w-full sm:w-auto text-left flex items-center gap-2 p-3 rounded-xl border bg-muted/30 hover:bg-muted/60 transition-colors shadow-sm focus:outline-none focus:ring-2 focus:ring-ring"
+        >
+          <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary shrink-0">
+            <HugeiconsIcon icon={Clock01Icon} size={16} />
+          </div>
+          <div className="flex flex-col overflow-hidden min-w-0">
+            <span className="text-xs font-semibold text-foreground">Use last location</span>
+            <span className="text-xs text-muted-foreground truncate">{savedLocation.label}</span>
+          </div>
+        </button>
       )}
     </Field>
   )

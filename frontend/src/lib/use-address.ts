@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
 const addressCache = new Map<string, any>();
 
 export function useAddressDetails(lat: number | undefined, lng: number | undefined) {
@@ -13,6 +14,7 @@ export function useAddressDetails(lat: number | undefined, lng: number | undefin
     
     // Check memory cache
     if (addressCache.has(key)) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setDetails(addressCache.get(key));
       return;
     }
@@ -26,7 +28,7 @@ export function useAddressDetails(lat: number | undefined, lng: number | undefin
         setDetails(parsed);
         return;
       }
-    } catch (e) {
+    } catch {
       // ignore
     }
 
@@ -66,13 +68,15 @@ export function useAddressDetails(lat: number | undefined, lng: number | undefin
         addressCache.set(key, result);
         try {
           localStorage.setItem(`addr_${key}`, JSON.stringify(result));
-        } catch (e) {}
+        } catch {
+          // ignore
+        }
         
         if (active) {
           setDetails(result);
           setLoading(false);
         }
-      } catch (e) {
+      } catch {
         if (active) setLoading(false);
       }
     }

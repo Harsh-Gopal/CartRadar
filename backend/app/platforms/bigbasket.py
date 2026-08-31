@@ -268,7 +268,16 @@ class BigBasketClient(PlatformClient):
                 headers={**_HEADERS, "Referer": WEB_BASE + "/"},
             )
             if resp.status_code == 200:
-                return resp.text
+                body = resp.text
+                # Cloudflare sends a JS challenge page when blocking server IPs.
+                # It looks like a 200 but contains no __NEXT_DATA__ and has these markers.
+                if ("cf-browser-verification" in body or
+                    "Just a moment" in body or
+                    "Enable JavaScript and cookies" in body or
+                    "cf_clearance" in body):
+                    log.warning("BB: Cloudflare JS challenge detected for pvid=%s (server IP likely blocked)", product_id)
+                    return "__CF_BLOCKED__"
+                return body
             log.warning("BB product page returned HTTP %s for pvid=%s", resp.status_code, product_id)
             return ""
         except BigBasketError as e:
@@ -406,7 +415,10 @@ class BigBasketClient(PlatformClient):
         if product_id:
             # Opportunistically fetch the product and cache the result
             html = await self._fetch_product_page(product_id, lat, lng)
-            if html:
+            if html == "__CF_BLOCKED__":
+                cache_key = f"{product_id}_{store_id}"
+                self._recent_checks[cache_key] = ProductResult(status="error")
+            elif html:
                 state = self._extract_next_data(html)
                 if state:
                     result = self._parse_product_state(state, product_id)
@@ -445,6 +457,8 @@ class BigBasketClient(PlatformClient):
             return ProductResult(status="error")
 
         html = await self._fetch_product_page(product_id, lat, lng)
+        if html == "__CF_BLOCKED__":
+            return ProductResult(status="error")
         if not html:
             return ProductResult(status="error")
 
