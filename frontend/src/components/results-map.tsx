@@ -10,14 +10,11 @@ import { STATUS_LABEL, getPlatformFromId } from "@/components/results-list"
 import type { StoreResult } from "@/lib/api"
 import { usePincode } from "@/lib/use-pincode"
 
-// Carto basemaps track the app theme: Positron (light) / Dark Matter (dark).
-// Cleaner than default OSM tiles and they actually have a dark variant.
-const TILE_URL = {
-  light: "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
-  dark: "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
-} as const
+// OpenStreetMap tiles — free, no API key, globally available.
+// Dark mode uses a CSS filter (invert + hue-rotate) on the tile pane.
+const TILE_URL = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
 const TILE_ATTRIBUTION =
-  '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
+  '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
 
 const PLATFORM_COLORS: Record<string, string> = {
   zepto: "#8B5CF6",
@@ -110,6 +107,7 @@ interface ResultsMapProps {
 
 export function ResultsMap({ lat, lng, radiusKm, results, homeStatus, homePrice, selectedId, searchPincode, onSelect, className }: ResultsMapProps) {
   const { resolvedTheme } = useTheme()
+  const isDark = (resolvedTheme ?? "dark") === "dark"
   return (
     <MapContainer
       center={[lat, lng]}
@@ -117,10 +115,12 @@ export function ResultsMap({ lat, lng, radiusKm, results, homeStatus, homePrice,
       className={cn("z-0 w-full", className || "h-72")}
       scrollWheelZoom={false}
     >
+      {/* Apply CSS filter on tile pane for dark mode — no API key needed */}
+      <style>{isDark ? ".leaflet-tile-pane { filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%); }" : ""}</style>
       <TileLayer
         key={resolvedTheme}
         attribution={TILE_ATTRIBUTION}
-        url={TILE_URL[resolvedTheme]}
+        url={TILE_URL}
       />
       <FitToRadius lat={lat} lng={lng} radiusKm={radiusKm} />
       <FlyToSelected results={results} selectedId={selectedId} />

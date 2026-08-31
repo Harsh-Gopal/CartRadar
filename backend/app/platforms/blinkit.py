@@ -38,11 +38,35 @@ async def _get_browser():
     global _BROWSER, _PLAYWRIGHT
     async with _LOCK:
         if _BROWSER is None:
-            from playwright.async_api import async_playwright
-            _PLAYWRIGHT = await async_playwright().start()
-            _BROWSER = await _PLAYWRIGHT.chromium.launch(headless=True)
-            log.info("Blinkit: Playwright browser started")
+            try:
+                from playwright.async_api import async_playwright
+                _PLAYWRIGHT = await async_playwright().start()
+                _BROWSER = await _PLAYWRIGHT.chromium.launch(headless=True)
+                log.info("Blinkit: Playwright browser started successfully")
+            except Exception as exc:
+                log.error(
+                    "Blinkit: Playwright browser FAILED to start: %s — "
+                    "Blinkit searches will return errors. "
+                    "Run 'playwright install-deps chromium' to fix missing system libraries.",
+                    exc,
+                )
+                _PLAYWRIGHT = None
+                _BROWSER = None
+                raise BlinkitError(f"Playwright launch failed: {exc}") from exc
     return _BROWSER
+
+
+async def prewarm_browser():
+    """Pre-warm Playwright at startup so the first search isn't slow.
+    
+    Called from the FastAPI lifespan hook. Errors are logged but not raised
+    so a broken Playwright doesn't prevent the whole server from starting.
+    """
+    try:
+        await _get_browser()
+        log.info("Blinkit: browser pre-warm complete")
+    except Exception as exc:
+        log.warning("Blinkit: browser pre-warm failed (Blinkit searches will be slow on first request): %s", exc)
 
 
 async def _close_browser():

@@ -75,6 +75,15 @@ export interface PlatformInfo {
   supports_geocoding: boolean
 }
 
+export interface DeliveryStatus {
+  is_open: boolean | null
+  always_open: boolean
+  opens_at: string | null    // "HH:MM" IST or null for 24x7
+  closes_at: string | null   // "HH:MM" IST or null for 24x7
+  notes: string
+  label: string
+}
+
 // -- access token ----------------------------------------------------------
 
 const TOKEN_KEY = "mf_token"
@@ -109,6 +118,17 @@ export function tokenQuery(): string {
 
 export function getConfig() {
   return request<AppConfig>("/api/config")
+}
+
+export function getDeliveryHours(city?: string) {
+  const q = city ? `?city=${encodeURIComponent(city)}` : ""
+  return request<Record<string, DeliveryStatus>>(`/api/delivery-hours${q}`)
+}
+
+/** Fire-and-forget: wake up Render from sleep before user performs a search. */
+export function pingBackend(): void {
+  const baseUrl = import.meta.env.VITE_API_URL || ""
+  fetch(`${baseUrl}/api/ping`).catch(() => { /* ignore — best-effort */ })
 }
 
 async function request<T>(input: string, init: RequestInit = {}): Promise<T> {

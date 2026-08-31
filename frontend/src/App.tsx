@@ -96,12 +96,14 @@ import {
   prettyStoreName,
 } from "@/components/results-list"
 import { ResultsMap } from "@/components/results-map"
+ import { DeliveryBadge, DeliveryWarningBanner } from "@/components/delivery-badge"
 import { useAddressDetails } from "@/lib/use-address"
 import { useSearch } from "@/hooks/use-search"
 import {
   detectPlatformFromUrl,
   getConfig,
   getToken,
+  pingBackend,
   PLATFORM_LABELS,
   resolveLink,
   setToken,
@@ -303,6 +305,9 @@ export function App() {
   const [appConfig, setAppConfig] = useState<AppConfig | null>(null)
   const [hasToken, setHasToken] = useState(() => !!getToken())
   const [tokenInput, setTokenInput] = useState("")
+
+  // Ping backend on load so Render wakes up from sleep before the user searches.
+  useEffect(() => { pingBackend() }, [])
 
   // Learn the instance's radius cap and whether it's token-gated.
   useEffect(() => {
@@ -794,7 +799,10 @@ export function App() {
                   <>
                     <Separator />
                     <div className="flex items-center justify-between gap-2 animate-in fade-in-0 slide-in-from-bottom-1">
-                      <PlatformBadge platform={platformName} size="md" />
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <PlatformBadge platform={platformName} size="md" />
+                        <DeliveryBadge platform={platformName} city={state.home?.city ?? null} />
+                      </div>
                       {resolved && (
                         <button
                           type="button"
@@ -907,6 +915,14 @@ export function App() {
                   </FieldGroup>
                 </CardContent>
               </Card>
+            )}
+
+            {/* Delivery hours warning — shown when platform is closed */}
+            {resolved && (
+              <DeliveryWarningBanner
+                platform={platformName}
+                city={state.home?.city ?? null}
+              />
             )}
 
             {state.error && (

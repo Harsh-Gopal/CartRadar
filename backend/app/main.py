@@ -4,6 +4,7 @@ Routes auto-detect which platform a link belongs to and dispatch to the
 correct PlatformClient.
 """
 
+import asyncio
 import hmac
 import httpx
 import json
@@ -69,6 +70,10 @@ async def lifespan(app: FastAPI):
     app.state.probe_budget = TokenBucket(
         config.PROBE_BURST, config.PROBES_PER_DAY / 86_400
     )
+    # Pre-warm Playwright browser in background so the first Blinkit search isn't slow.
+    if "blinkit" in config.ENABLED_PLATFORMS:
+        from .platforms.blinkit import prewarm_browser
+        asyncio.create_task(prewarm_browser())
     yield
     for client in app.state.clients.values():
         await client.aclose()
@@ -157,6 +162,26 @@ class ResolveRequest(BaseModel):
     url: str
     lat: float | None = None
     lng: float | None = None
+
+
+@app.get("/api/ping")
+async def ping():
+    """Liveness / wake-up endpoint. No auth required. Used by the frontend to
+    pre-warm Render from sleep before the user performs a search."""
+    return {"ok": True}
+
+
+@app.get("/api/delivery-hours")
+async def delivery_hours(city: str | None = Query(default=None)):
+    """Return current delivery status for all enabled platforms.
+
+    Pass ?city=<city name> to get accurate 24×7 status for metro areas.
+    Response is not rate-limited (pure local computation, no external calls).
+    """
+    from .delivery_hours import get_all_delivery_status
+    all_status = get_all_delivery_status(city)
+    # Only return status for enabled platforms
+    return {p: s for p, s in all_status.items() if p in config.ENABLED_PLATFORMS}
 
 
 @app.get("/api/config")

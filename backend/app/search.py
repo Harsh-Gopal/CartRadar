@@ -96,8 +96,12 @@ async def run_search(
     async def main_flow() -> None:
         try:
             if client.supports_sweep:
-                # Full sweep flow (like Zepto)
-                await _sweep_flow()
+                # Full sweep flow (like Zepto) — with a hard timeout so WAF blocks don't hang forever
+                try:
+                    await asyncio.wait_for(_sweep_flow(), timeout=90.0)
+                except asyncio.TimeoutError:
+                    log.warning("sweep timed out after 90s on %s — emitting done", platform)
+                    await emit({"type": "done", "summary": dict(counts)})
             else:
                 # Simple location check (for platforms without sweep support yet)
                 await _simple_flow()
