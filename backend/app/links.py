@@ -23,6 +23,7 @@ PLATFORM_HOSTS: dict[str, tuple[str, ...]] = {
     "bbnow": ("bbnow.bigbasket.com",),
     "bigbasket": ("bigbasket.com", "bb.com", "bbdaily.com"),
     "blinkit": ("blinkit.com", "grofers.com", "blinkit.app.link"),
+    "flipkart": ("flipkart.com",),
 }
 
 # -- Per-platform product ID regexes ----------------------------------------
@@ -45,19 +46,27 @@ BB_PRODUCT_RE = re.compile(r"/pd/(\d+)(?:[/?#]|$)")
 BLINKIT_PRODUCT_RE = re.compile(r"/pr(?:oduct)?/(?:.*?/prid/)?(\d+)")
 # BB Now: same format as BigBasket (/pd/{numeric_id}/)
 BBNOW_PRODUCT_RE = re.compile(r"/pd/(\d+)(?:[/?#]|$)")
+# Flipkart product ID: /p/{product_id}
+FLIPKART_PRODUCT_RE = re.compile(r"/p/([a-zA-Z0-9]+)(?:[/?#]|$)")
 
 
 def detect_platform(url: str) -> str | None:
     """Detect which platform a URL belongs to.
 
-    Returns 'zepto' | 'swiggy' | 'bigbasket' | 'blinkit' | None.
+    Returns 'zepto' | 'swiggy' | 'bigbasket' | 'blinkit' | 'flipkart' | 'flipkart_minutes' | None.
     """
     try:
-        host = (urlparse(url.strip()).hostname or "").lower()
+        parsed = urlparse(url.strip())
+        host = (parsed.hostname or "").lower()
     except ValueError:
         return None
     for platform, hosts in PLATFORM_HOSTS.items():
         if any(host == h or host.endswith("." + h) for h in hosts):
+            if platform == "flipkart":
+                qs = parse_qs(parsed.query)
+                marketplace = qs.get("marketplace", [""])[0].upper()
+                if marketplace == "HYPERLOCAL":
+                    return "flipkart_minutes"
             return platform
     return None
 
@@ -87,6 +96,9 @@ def extract_product_id(text: str) -> tuple[str | None, str | None]:
     elif platform == "bbnow":
         m = BBNOW_PRODUCT_RE.search(text)
         return ("bbnow", m.group(1)) if m else ("bbnow", None)
+    elif platform == "flipkart" or platform == "flipkart_minutes":
+        m = FLIPKART_PRODUCT_RE.search(text)
+        return (platform, m.group(1)) if m else (platform, None)
 
     # Not a known platform URL — try raw pvid  extraction (Zepto-style)
     pid = _extract_zepto_id(text)

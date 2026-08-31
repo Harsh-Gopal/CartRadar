@@ -206,6 +206,8 @@ export const PLATFORM_COLORS: Record<string, string> = {
   bigbasket: "#84C225",    // BigBasket green
   blinkit: "#F5C913",      // Blinkit yellow
   bbnow: "#C4162A",        // Tata Neu / BB Now red
+  flipkart: "#2874F0",     // Flipkart blue
+  flipkart_minutes: "#2874F0",
 }
 
 export const PLATFORM_LABELS: Record<string, string> = {
@@ -214,6 +216,8 @@ export const PLATFORM_LABELS: Record<string, string> = {
   bigbasket: "BigBasket",
   blinkit: "Blinkit",
   bbnow: "BB Now",
+  flipkart: "Flipkart",
+  flipkart_minutes: "Flipkart Minutes",
 }
 
 export function detectPlatformFromUrl(url: string): string | null {
@@ -224,6 +228,20 @@ export function detectPlatformFromUrl(url: string): string | null {
   if (lower.includes("bbnow.bigbasket.com")) return "bbnow"
   if (lower.includes("bigbasket.com") || lower.includes("bb.com")) return "bigbasket"
   if (lower.includes("blinkit.com") || lower.includes("grofers.com")) return "blinkit"
+  
+  if (lower.includes("flipkart.com")) {
+    try {
+      const parsedUrl = new URL(url)
+      const marketplace = parsedUrl.searchParams.get("marketplace")
+      if (marketplace && marketplace.toUpperCase() === "HYPERLOCAL") {
+        return "flipkart_minutes"
+      }
+      return "flipkart"
+    } catch {
+      return "flipkart"
+    }
+  }
+
   // Zepto pvid pattern
   if (/\/pvid\/[0-9a-f-]{36}/i.test(lower)) return "zepto"
   return null

@@ -28,6 +28,7 @@ from .platforms.swiggy import SwiggyClient
 from .platforms.bigbasket import BigBasketClient
 from .platforms.blinkit import BlinkitClient
 from .platforms.bbnow import BBNowClient
+from .platforms.flipkart import FlipkartClient, FlipkartMinutesClient
 from .ratelimit import ConcurrencyGate, RateLimiter, TokenBucket
 from .search import run_search
 from .store_cache import StoreCache
@@ -53,6 +54,10 @@ def _create_clients() -> dict[str, PlatformClient]:
         log.warning("Blinkit is in ENABLED_PLATFORMS but PLAYWRIGHT_ENABLED=false — skipping Blinkit")
     if "bbnow" in config.ENABLED_PLATFORMS:
         clients["bbnow"] = BBNowClient(config.PROXY_URL, 4)
+    if "flipkart" in config.ENABLED_PLATFORMS:
+        clients["flipkart"] = FlipkartClient()
+    if "flipkart_minutes" in config.ENABLED_PLATFORMS:
+        clients["flipkart_minutes"] = FlipkartMinutesClient()
     log.info("enabled platforms: %s", list(clients.keys()))
     return clients
 

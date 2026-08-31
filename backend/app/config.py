@@ -45,6 +45,6 @@ UNSERVICEABLE_PROBE_TTL_DAYS = 30
 # others are implemented. Set to "zepto,swiggy,bigbasket,blinkit" to enable all.
 ENABLED_PLATFORMS = [
     p.strip()
-    for p in os.environ.get("ENABLED_PLATFORMS", "zepto,swiggy,bigbasket,blinkit,bbnow").split(",")
+    for p in os.environ.get("ENABLED_PLATFORMS", "zepto,swiggy,bigbasket,blinkit,bbnow,flipkart,flipkart_minutes").split(",")
     if p.strip()
 ]
