@@ -32,6 +32,7 @@ from typing import Any
 import httpx
 
 from .base import PlatformClient, PlatformError, ProductResult, StoreResolution
+from ..normalization import parse_quantity
 
 log = logging.getLogger("swiggy")
 
@@ -109,6 +110,7 @@ def _extract_redux(html: str) -> dict:
         "price": None,
         "mrp": None,
         "image_url": None,
+        "raw_quantity": None,
     }
 
     if not html:
@@ -150,6 +152,14 @@ def _extract_redux(html: str) -> dict:
         result["brand"] = brand_m.group(1) if brand_m else None
         result["in_stock"] = (instock_m.group(1) == "true") if instock_m else None
         result["is_avail"] = (isavail_m.group(1) == "true") if isavail_m else None
+
+        pack_m = re.search(r'"quantity"\s*:\s*"([^"]+)"', chunk)
+        if not pack_m:
+            pack_m = re.search(r'"pack_size"\s*:\s*"([^"]+)"', chunk)
+        if not pack_m:
+            pack_m = re.search(r'"weight"\s*:\s*"([^"]+)"', chunk)
+        if pack_m:
+            result["raw_quantity"] = pack_m.group(1)
 
         # Price (offerPrice)
         offer_m = re.search(
@@ -212,13 +222,29 @@ def _data_to_product(data: dict, product_id: str) -> ProductResult:
         # Fallback to conservative out_of_stock when data is missing
         status = "out_of_stock"
 
+    price = data.get("price")
+    
+    # Pack normalization
+    qty_str = data.get("raw_quantity") or ""
+    title_str = data.get("name") or ""
+    variant_label = qty_str if qty_str else title_str
+    nq = parse_quantity(variant_label)
+
     return ProductResult(
         status=status,
         name=data.get("name"),
         brand=data.get("brand"),
         image_url=data.get("image_url"),
-        price=data.get("price"),
+        price=price,
         mrp=data.get("mrp"),
+        pack_count=nq.pack_count if nq else None,
+        quantity_per_pack=nq.quantity_per_pack if nq else None,
+        quantity_unit=nq.quantity_unit if nq else None,
+        total_quantity=nq.total_quantity if nq else None,
+        total_quantity_unit=nq.total_quantity_unit if nq else None,
+        price_per_unit=(price) / nq.total_quantity if (price and nq and nq.total_quantity > 0) else None,
+        raw_variant=variant_label,
+        quantity_confidence=nq.confidence if nq else None
     )
 
 

@@ -6,6 +6,15 @@ export interface ProductInfo {
   price: number | null
   mrp: number | null
   available_quantity: number | null
+  // Normalized quantity and pack fields
+  pack_count?: number | null
+  quantity_per_pack?: number | null
+  quantity_unit?: string | null
+  total_quantity?: number | null
+  total_quantity_unit?: string | null
+  price_per_unit?: number | null
+  raw_variant?: string | null
+  quantity_confidence?: string | null
 }
 
 export interface ResolveResponse {
@@ -52,6 +61,7 @@ export interface StoreResult {
   price: number | null
   mrp: number | null
   platform?: string
+  product?: ProductInfo | null
 }
 
 export interface SearchSummary {

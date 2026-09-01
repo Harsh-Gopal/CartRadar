@@ -135,9 +135,16 @@ function StoreListItem({
         </ItemContent>
         <ItemActions className="flex-col items-end gap-1 shrink-0">
           {r.status === "in_stock" && r.price != null ? (
-            <span className="text-sm font-semibold tabular-nums text-primary">
-              ₹{formatPrice(r.price)}
-            </span>
+            <div className="flex flex-col items-end">
+              <span className="text-sm font-semibold tabular-nums text-primary">
+                ₹{formatPrice(r.price)}
+              </span>
+              {r.product?.pack_count && r.product.pack_count > 1 && r.product.price_per_unit != null && (
+                <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                  (₹{formatPrice(r.product.price_per_unit)} / {r.product.quantity_unit})
+                </span>
+              )}
+            </div>
           ) : (
             <span className="text-sm font-medium opacity-0">₹0</span>
           )}

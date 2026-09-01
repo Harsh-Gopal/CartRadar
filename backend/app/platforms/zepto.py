@@ -14,6 +14,7 @@ from urllib.parse import quote, unquote
 import httpx
 
 from .base import PlatformClient, PlatformError, ProductResult, StoreResolution
+from ..normalization import parse_quantity
 
 log = logging.getLogger("zepto")
 
@@ -72,6 +73,14 @@ def _parse_product_detail(data: dict) -> ProductResult:
     image_url = f"{CDN_BASE}/{images[0]['path']}" if images else None
     price_paise = sp.get("discountedSellingPrice") or sp.get("superSaverSellingPrice")
     mrp_paise = sp.get("mrp") or variant.get("mrp")
+    
+    # Pack normalization
+    weight_str = variant.get("weight") or ""
+    title_str = product.get("name") or ""
+    # Usually Zepto variant looks like "400 g x 2" or "Pack of 2" in weight or title
+    variant_label = weight_str if weight_str else title_str
+    nq = parse_quantity(variant_label)
+    
     return ProductResult(
         status="out_of_stock" if sp.get("outOfStock") else "in_stock",
         name=product.get("name"),
@@ -80,6 +89,14 @@ def _parse_product_detail(data: dict) -> ProductResult:
         price=price_paise / 100 if price_paise else None,
         mrp=mrp_paise / 100 if mrp_paise else None,
         available_quantity=sp.get("availableQuantity"),
+        pack_count=nq.pack_count if nq else None,
+        quantity_per_pack=nq.quantity_per_pack if nq else None,
+        quantity_unit=nq.quantity_unit if nq else None,
+        total_quantity=nq.total_quantity if nq else None,
+        total_quantity_unit=nq.total_quantity_unit if nq else None,
+        price_per_unit=(price_paise / 100) / nq.total_quantity if (price_paise and nq and nq.total_quantity > 0) else None,
+        raw_variant=variant_label,
+        quantity_confidence=nq.confidence if nq else None
     )
 
 

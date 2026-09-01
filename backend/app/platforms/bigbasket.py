@@ -29,6 +29,7 @@ import httpx
 from .. import config
 from .base import PlatformClient, PlatformError, ProductResult, StoreResolution
 from ..grid import haversine_km
+from ..normalization import parse_quantity
 
 log = logging.getLogger("bigbasket")
 
@@ -360,6 +361,13 @@ class BigBasketClient(PlatformClient):
                 img = images[0]
                 image_url = img.get("m") or img.get("s") or img.get("l")
 
+            pack_desc = target.get("pack_desc") or ""
+            if pack_desc and pack_desc not in name:
+                name = f"{name} {pack_desc}"
+
+            variant_label = pack_desc if pack_desc else (name or "")
+            nq = parse_quantity(variant_label)
+
             if status != "in_stock":
                 return ProductResult(
                     status=status,
@@ -368,6 +376,14 @@ class BigBasketClient(PlatformClient):
                     image_url=image_url,
                     price=price,
                     mrp=mrp,
+                    pack_count=nq.pack_count if nq else None,
+                    quantity_per_pack=nq.quantity_per_pack if nq else None,
+                    quantity_unit=nq.quantity_unit if nq else None,
+                    total_quantity=nq.total_quantity if nq else None,
+                    total_quantity_unit=nq.total_quantity_unit if nq else None,
+                    price_per_unit=(price) / nq.total_quantity if (price and nq and nq.total_quantity > 0) else None,
+                    raw_variant=variant_label,
+                    quantity_confidence=nq.confidence if nq else None
                 )
 
             return ProductResult(
@@ -377,6 +393,14 @@ class BigBasketClient(PlatformClient):
                 image_url=image_url,
                 price=price,
                 mrp=mrp,
+                pack_count=nq.pack_count if nq else None,
+                quantity_per_pack=nq.quantity_per_pack if nq else None,
+                quantity_unit=nq.quantity_unit if nq else None,
+                total_quantity=nq.total_quantity if nq else None,
+                total_quantity_unit=nq.total_quantity_unit if nq else None,
+                price_per_unit=(price) / nq.total_quantity if (price and nq and nq.total_quantity > 0) else None,
+                raw_variant=variant_label,
+                quantity_confidence=nq.confidence if nq else None
             )
         except Exception as e:
             log.error("BB parse error: %s", e, exc_info=True)
