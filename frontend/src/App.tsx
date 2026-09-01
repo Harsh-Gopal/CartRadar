@@ -28,7 +28,6 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion"
-import { ZeptoResultCard } from "@/components/zepto-result"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -98,7 +97,7 @@ import {
 } from "@/components/results-list"
 import { ResultsMap } from "@/components/results-map"
  import { DeliveryBadge, DeliveryWarningBanner } from "@/components/delivery-badge"
-import { useAddressDetails } from "@/lib/use-address"
+import { useGeocode } from "@/hooks/use-geocode"
 import { useSearch } from "@/hooks/use-search"
 import {
   detectPlatformFromUrl,
@@ -184,47 +183,99 @@ function looksResolvable(text: string): boolean {
 const RADIUS_PRESETS = [5, 10, 20, 30]
 
 function AddressSection({ lat, lng }: { lat: number; lng: number }) {
-  const { details, loading } = useAddressDetails(lat, lng)
+  const { result, state } = useGeocode(lat, lng)
 
-  if (loading) {
-    return <div className="text-xs text-muted-foreground animate-pulse mt-2 p-3 bg-muted/30 rounded-lg border">Finding precise address...</div>
+  if (state === "LOADING") {
+    return <div className="text-[11px] text-muted-foreground animate-pulse mt-2 p-3 bg-muted/30 rounded-lg border flex items-center gap-2">
+      <HugeiconsIcon icon={MapPinIcon} className="w-3.5 h-3.5" />
+      Resolving precise location...
+    </div>
   }
 
-  if (!details) return null
+  if (state === "FAILED" || state === "INVALID_COORDINATES") {
+    return (
+      <div className="mt-2 space-y-2 bg-muted/30 rounded-lg p-3 border">
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex items-center gap-2 text-destructive/80">
+            <HugeiconsIcon icon={CancelCircleIcon} className="w-4 h-4" />
+            <p className="text-xs font-semibold">Address unavailable</p>
+          </div>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="h-7 text-[10px]" 
+            onClick={() => window.open(`https://www.google.com/maps/search/?api=1&query=${lat},${lng}`, "_blank")}
+          >
+            <HugeiconsIcon icon={MapPinIcon} className="w-3 h-3 mr-1" />
+            Open in Maps
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
+  if (!result || state === "IDLE") return null
+
+  const isApproximate = result.confidence === "LOW" || result.confidence === "UNKNOWN"
 
   return (
     <div className="mt-2 space-y-2 bg-muted/30 rounded-lg p-3 border">
       <div className="flex items-start justify-between gap-2">
-        <div>
-          <p className="text-xs font-semibold text-foreground/80">Location Address</p>
-          <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2" title={details.address}>
-            {details.address}
+        <div className="flex-1">
+          <div className="flex items-center gap-1.5 mb-1">
+            <HugeiconsIcon icon={MapPinIcon} className="w-3.5 h-3.5 text-primary" />
+            <p className="text-xs font-semibold text-foreground/80">
+              {result.short_address}
+            </p>
+          </div>
+          <p className="text-[11px] text-muted-foreground leading-relaxed line-clamp-2" title={result.formatted_address}>
+            {result.formatted_address}
           </p>
+          {isApproximate && (
+            <p className="text-[10px] text-amber-600/90 font-medium mt-1.5 flex items-center gap-1">
+              <HugeiconsIcon icon={InformationCircleIcon} className="w-3 h-3" />
+              Approximate location based on warehouse coordinates
+            </p>
+          )}
         </div>
+        <div className="flex flex-col gap-1.5 shrink-0">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="h-6 w-6" 
+            onClick={() => {
+              navigator.clipboard.writeText(result.formatted_address)
+              toast.success("Address copied")
+            }}
+            title="Copy Address"
+          >
+            <HugeiconsIcon icon={Copy01Icon} className="w-3.5 h-3.5" />
+          </Button>
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="h-6 w-6" 
+            onClick={() => {
+              navigator.clipboard.writeText(`${lat}, ${lng}`)
+              toast.success("Coordinates copied")
+            }}
+            title="Copy Coordinates"
+          >
+            <HugeiconsIcon icon={LocationOffline01Icon} className="w-3.5 h-3.5" />
+          </Button>
+        </div>
+      </div>
+      <div className="pt-2 border-t border-border/50 mt-2">
         <Button 
-          variant="ghost" 
-          size="icon" 
-          className="h-6 w-6 shrink-0" 
-          onClick={() => {
-            navigator.clipboard.writeText(details.address)
-            toast.success("Address copied")
-          }}
-          title="Copy Address"
+          variant="secondary" 
+          size="sm" 
+          className="w-full text-[11px] h-7"
+          onClick={() => window.open(`https://www.google.com/maps/search/?api=1&query=${lat},${lng}`, "_blank")}
         >
-          <HugeiconsIcon icon={Copy01Icon} className="w-3.5 h-3.5" />
+          Open in Maps
+          <HugeiconsIcon icon={ArrowUpRight01Icon} className="w-3 h-3 ml-1" />
         </Button>
       </div>
-
-      {details.suggestions && details.suggestions.length > 0 && (
-        <div className="pt-1 border-t border-border/50 mt-2">
-          <p className="text-[11px] font-semibold text-foreground/80">Nearby Landmarks (for delivery reference)</p>
-          <ul className="text-[11px] text-muted-foreground list-disc pl-4 mt-1 space-y-0.5">
-            {details.suggestions.map((s: string, i: number) => (
-              <li key={i}>{s}</li>
-            ))}
-          </ul>
-        </div>
-      )}
     </div>
   )
 }
@@ -374,10 +425,13 @@ export function App() {
   async function doResolve(text: string) {
     setResolving(true)
     setResolveError(null)
+    const currentLoc = coords ? `${coords.lat},${coords.lng}` : ""
+    const cacheKey = `${text}|${currentLoc}`
+    
     try {
       const result = await resolveLink(text, coords)
       setResolved(result)
-      resolvedFor.current = text
+      resolvedFor.current = cacheKey
       setRecent((prev) => {
         const next: RecentProduct[] = [
           {
@@ -409,6 +463,7 @@ export function App() {
       })
     } catch (e) {
       setResolved(null)
+      resolvedFor.current = null
       setResolveError(
         e instanceof Error ? e.message : "Couldn't read that link."
       )
@@ -420,17 +475,20 @@ export function App() {
   // Auto-resolve as soon as the pasted text looks like a Zepto link.
   useEffect(() => {
     const text = linkText.trim()
+    const currentLoc = coords ? `${coords.lat},${coords.lng}` : ""
+    const currentKey = `${text}|${currentLoc}`
+    
     if (
       !text ||
       resolving ||
-      resolvedFor.current === text ||
+      resolvedFor.current === currentKey ||
       !looksResolvable(text)
     )
       return
     const timer = setTimeout(() => doResolve(text), 350)
     return () => clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [linkText, resolving])
+  }, [linkText, resolving, coords])
 
   const searchKey =
     resolved && coords

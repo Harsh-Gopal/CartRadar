@@ -1,0 +1,753 @@
+{
+  "CACHE_INVALIDATION_TTL": "0",
+  "META_INFO": {
+    "abContext": {
+      "abWrapper": [
+        {
+          "abId": "STG|launchedGroup|46aeb36d|h"
+        }
+      ]
+    },
+    "appConfigHash": "1788211602441",
+    "clientConfigHashMap": {
+      "ReactNative": "1788206310933",
+      "fk-mobile-api": "1788211602441"
+    },
+    "dcInfo": null,
+    "omnitureInfo": {
+      "additionProperties": null,
+      "bucketId": "17",
+      "ingestionEnabled": false
+    }
+  },
+  "REQUEST": null,
+  "REQUEST-ID": "97a51a9a-d4ab-4842-8d4a-44c468310885",
+  "RESPONSE": {
+    "meta": {
+      "loc": {
+        "ipInfo": {
+          "country": "India",
+          "state": "Bihar",
+          "city": "Patna",
+          "ip": "49.47.130.113"
+        }
+      }
+    },
+    "nonVersionedData": {
+      "groceryEnabled": false,
+      "locale": "en",
+      "pendingAppLocaleChange": false,
+      "time": {
+        "serverTimestamp": 1788216019373
+      }
+    },
+    "versionedData": {
+      "abResponse": {
+        "abDataId": -1433458382,
+        "abExperiments": [
+          {
+            "abId": "STG|launchedGroup|033288de|h",
+            "appId": "Mapi",
+            "expId": "gh-5953-fassured-logo-revamp",
+            "metadata": {
+              "revampedFAssured": true
+            }
+          },
+          {
+            "abId": "STG|launchedGroup|fa30ec3a|h",
+            "appId": "Mapi",
+            "expId": "value_comms_shopsy",
+            "metadata": {
+              "value_comms": true
+            }
+          },
+          {
+            "abId": "STG|launchedGroup|b1cfdbd0|h",
+            "appId": "Mapi",
+            "expId": "sonic_gcp_migration_msite",
+            "metadata": {
+              "sonicGcpMigration": true
+            }
+          },
+          {
+            "abId": "STG|launchedGroup|77803d84|h",
+            "appId": "Mapi",
+            "expId": "gh-2934-collapse-freebie-widget",
+            "metadata": {
+              "collapseFreebies": true
+            }
+          },
+          {
+            "abId": "STG|launchedGroup|5a11c9ad|h",
+            "appId": "Mapi",
+            "expId": "enableexpresscheckoutshopsy",
+            "metadata": {
+              "enableExpressCheckoutShopsy": true,
+              "ecoConfirmModalEnabled": "false",
+              "enableSwipeButton": "false"
+            }
+          },
+          {
+            "abId": "STG|launchedGroup|ed85c2d8|h",
+            "appId": "Mapi",
+            "expId": "asgard_atlas_ab_msite",
+            "metadata": {
+              "enableOneViewMsiteHP": true,
+              "asgard_ab_enabled": true
+            }
+          },
+          {
+            "abId": "STG|launchedGroup|fb587ba2|h",
+            "appId": "Mapi",
+            "expId": "dls_compliant_ghp",
+            "metadata": {
+              "isGroceryDLSEnabled": true
+            }
+          },
+          {
+            "abId": "STG|launchedGroup|ba8d3149|h",
+            "appId": "Mapi",
+            "expId": "value_tags_on_feed",
+            "metadata": {
+              "value_tags_feed": true
+            }
+          },
+          {
+            "abId": "STG|launchedGroup|ac30948b|h",
+            "appId": "Mapi",
+            "expId": "grocery_hp_optimisations",
+            "metadata": {
+              "groceryHomePageOptimisation": true
+            }
+          },
+          {
+            "abId": "STG|launchedGroup|2ab5bb86|h",
+            "appId": "Mapi",
+            "expId": "gh-4843-price-standardisation-handling-wrap",
+            "metadata": {
+              "enablePSHandlingWrap": true,
+              "enablePriceStandardizationV1": true,
+              "enablePriceSpaceAdjustment": true,
+              "DiscountIconPS": "DOWNWARD_ARROW"
+            }
+          },
+          {
+            "abId": "STG|launchedGroup|92fc6b33|h",
+            "appId": "Mapi",
+            "expId": "search_bar_theming_bau",
+            "metadata": {
+              "asSearchBarTheme": true
+            }
+          },
+          {
+            "abId": "STG|launchedGroup|02145d74|h",
+            "appId": "Mapi",
+            "expId": "gh-5410-animation-on-search-filter",
+            "metadata": {
+              "searchFilterAnimation": true
+            }
+          },
+          {
+            "abId": "STG|launchedGroup|464e29b5|h",
+            "appId": "Mapi",
+            "expId": "fast_fashion_v2",
+            "metadata": {
+              "isFastFashionThemeEnabled": true
+            }
+          },
+          {
+            "abId": "STG|launchedGroup|8860a34a|h",
+            "appId": "Mapi",
+            "expId": "mall_transition_new",
+            "metadata": {
+              "new_transition": true
+            }
+          },
+          {
+            "abId": "STG|launchedGroup|c35a2c78|h",
+            "appId": "Mapi",
+            "expId": "appconfig_msite",
+            "metadata": {
+              "configPollingIntervalMsite": 45000,
+              "pointToCdnMsite": true
+            }
+          },
+          {
+            "abId": "STG|launchedGroup|827977ec|h",
+            "appId": "Mapi",
+            "expId": "gh-3794-vas-widget-upgrade-pp-cart",
+            "metadata": {
+              "abPriceVariationPPEnabled": true,
+              "abPVPPFinalPricePosition": 3,
+              "abPVPPDiscountFontWeight": "MEDIUM",
+              "abPVPPStrikeOffMRPPosition": 2,
+              "abPVPPStrikeOffMRPFontWeight": "MEDIUM",
+              "abPVPPFinalPriceFontWeight": "MEDIUM",
+              "showBestSellerSpotlight": true,
+              "abPriceVariationSPCartEnabled": true,
+              "abPVPPDiscountPosition": 1,
+              "enablePriceVariationForVASWidget": true
+            }
+          },
+          {
+            "abId": "STG|launchedGroup|04fab975|h",
+            "appId": "Mapi",
+            "expId": "enhanced_deals_tag_experiment",
+            "metadata": {
+              "enhancedDealsTagAB": true
+            }
+          },
+          {
+            "abId": "STG|launchedGroup|5215c9a3|h",
+            "appId": "Mapi",
+            "expId": "ghi-115-c-co-emphasize-savings",
+            "metadata": {
+              "isCartCheckoutEmphasizeSavingsEnabled": true
+            }
+          },
+          {
+            "abId": "STG|launchedGroup|d2b0d2b3|h",
+            "appId": "Mapi",
+            "expId": "gh-3787-pp-best-seller-reco",
+            "metadata": {
+              "topChartsTitleCopyVariant": "TITLE_COPY1",
+              "topChartsSpotlightDisabled": false,
+              "recoHighlightsEnabled": true,
+              "topChartsBannerIconVariant": "STATIC_ICON_STAR"
+            }
+          },
+          {
+            "abId": "STG|launchedGroup|895401ca|h",
+            "appId": "Mapi",
+            "expId": "top_filters_animation_v1",
+            "metadata": {
+              "isTopFilterAnimationV2Enabled": "true"
+            }
+          },
+          {
+            "abId": "STG|launchedGroup|9e6ebec3|h",
+            "appId": "Mapi",
+            "expId": "gh-3550-across-funnel-renaming-ads-to-sponsored",
+            "metadata": {
+              "isAdPositionChanged": true,
+              "renameAdToSponsored": true
+            }
+          },
+          {
+            "abId": "STG|launchedGroup|4aad7243|h",
+            "appId": "Mapi",
+            "expId": "v2_on_msite_version_3",
+            "metadata": {
+              "ENABLE_NEW_WIDGET_ON_MSITE": true
+            }
+          },
+          {
+            "abId": "STG|launchedGroup|18952fa7|h",
+            "appId": "Mapi",
+            "expId": "pp_-_dynamic_reco_card_height",
+            "metadata": {
+              "dynamicRecoCardHeight": true
+            }
+          },
+          {
+            "abId": "STG|launchedGroup|22d53d3b|h",
+            "appId": "Mapi",
+            "expId": "myaccounts_dls",
+            "metadata": {
+              "myaccounts_dls_v4": true
+            }
+          },
+          {
+            "abId": "STG|launchedGroup|9c713d60|h",
+            "appId": "Mapi",
+            "expId": "myaccount_dls_launch",
+            "metadata": {
+              "myaccounts_dls_v4": true
+            }
+          },
+          {
+            "abId": "STG|launchedGroup|2b2648f2|h",
+            "appId": "Mapi",
+            "expId": "ghi-213-pp-view-cta-for-pla-add",
+            "metadata": {
+              "showViewButtonOnPLAAds": true
+            }
+          },
+          {
+            "abId": "STG|launchedGroup|f46b74f7|h",
+            "appId": "Mapi",
+            "expId": "hmpu_refresh_",
+            "metadata": {
+              "enableHPMUDesignChanges": true
+            }
+          },
+          {
+            "abId": "STG|launchedGroup|a69e0810|h",
+            "appId": "Mapi",
+            "expId": "pn_image_load_error",
+            "metadata": {
+              "shouldDisableFallbackImageForPN": true
+            }
+          },
+          {
+            "abId": "STG|inlineTargetingRules|ef86ef4d|h",
+            "appId": "Mapi",
+            "expId": "msite_html_streaming",
+            "metadata": {
+              "isMsiteHtmlStreamingEnabled": false
+            }
+          },
+          {
+            "abId": "STG|launchedGroup|0f6fc508|h",
+            "appId": "Mapi",
+            "expId": "video_load_strategy_experiment_layered_v5",
+            "metadata": {
+              "minBufferMs": 3500,
+              "bufferForPlaybackAfterRebufferMs": 1500,
+              "maxBufferMs": 10000,
+              "bufferForPlaybackMs": 1500
+            }
+          },
+          {
+            "abId": "STG|launchedGroup|a75d324f|h",
+            "appId": "Mapi",
+            "expId": "view_based_resolution_experiment_layered_v5",
+            "metadata": {
+              "videoResolutionViewSizeScale": 0.75,
+              "isVideoResolutionByViewSizeEnabled": true
+            }
+          },
+          {
+            "abId": "STG|launchedGroup|99627049|h",
+            "appId": "Mapi",
+            "expId": "justpay__ios",
+            "metadata": {
+              "enableiOSJustPaySDK": true
+            }
+          },
+          {
+            "abId": "STG|launchedGroup|66e48ed6|h",
+            "appId": "Mapi",
+            "expId": "juspay_ios_v2_minutes",
+            "metadata": {
+              "enableiOSJustPaySDKV2": true
+            }
+          },
+          {
+            "abId": "STG|launchedGroup|2bb14007|h",
+            "appId": "Mapi",
+            "expId": "juspay_ios_v2_flipkart",
+            "metadata": {
+              "enableiOSJustPaySDKFlipkartV2": true
+            }
+          },
+          {
+            "abId": "STG|launchedGroup|bf57ae88|h",
+            "appId": "Mapi",
+            "expId": "ghp_revamp_desktop",
+            "metadata": {
+              "enableOneViewGhpDesktop": true
+            }
+          },
+          {
+            "abId": "STG|launchedGroup|cccc9e27|h",
+            "appId": "Mapi",
+            "expId": "bh_rule_testing_for_desktop_hp_-_min_nav",
+            "metadata": {
+              "enableOneViewMhpDesktop": true
+            }
+          },
+          {
+            "abId": "STG|5FMNFApxxknUBpv9yo8dP:override|b6715d98|h",
+            "appId": "Mapi",
+            "expId": "neprevamp",
+            "metadata": {
+              "atlas_pp": true,
+              "enableOneViewPP": true
+            }
+          },
+          {
+            "abId": "STG|prestart|bc0e9f22|h",
+            "appId": "Mapi",
+            "expId": "productpage_revamp",
+            "metadata": {
+              "atlas_pp": false
+            }
+          },
+          {
+            "abId": "STG|inlineTargetingRules|cac93f56|h",
+            "appId": "Mapi",
+            "expId": "msite_pp_preload",
+            "metadata": {
+              "isPPLCPImagePreloadEnabled": false
+            }
+          },
+          {
+            "abId": "STG|inlineTargetingRules|dea69671|h",
+            "appId": "Mapi",
+            "expId": "msite_ghp_mhp_ssr",
+            "metadata": {
+              "isGhpMhpSSREnabled": false
+            }
+          },
+          {
+            "abId": "STG|launchedGroup|3d446348|h",
+            "appId": "Mapi",
+            "expId": "haptics_feedback_flo",
+            "metadata": {
+              "enableHaptics": true
+            }
+          },
+          {
+            "abId": "STG|inlineTargetingRules|f806a038|h",
+            "appId": "Mapi",
+            "expId": "minutes-_rain_fees_and_surge",
+            "metadata": {
+              "enableAddressBarKeyRemount": false
+            }
+          },
+          {
+            "abId": "STG|launchedGroup|f0c1b23b|h",
+            "appId": "Mapi",
+            "expId": "flo_android_pagination",
+            "metadata": {
+              "rules.isFloPaginationLoaderEnabled": true
+            }
+          },
+          {
+            "abId": "STG|launchedGroup|2303dd5e|h",
+            "appId": "Mapi",
+            "expId": "childitemrevamp",
+            "metadata": {
+              "childitemrevamp": true
+            }
+          },
+          {
+            "abId": "STG|prestart|dcec5780|h",
+            "appId": "Mapi",
+            "expId": "hero_animation_android_layered",
+            "metadata": {
+              "isHeroAnimationEnable": false
+            }
+          },
+          {
+            "abId": "STG|launchedGroup|a1e9456d|h",
+            "appId": "Mapi",
+            "expId": "msite_bottom_bar",
+            "metadata": {
+              "isMsiteTabbedHeaderEnabled": true,
+              "enablePersistentBottomBar": false,
+              "showBottomBarOnATC": true,
+              "drop_dd_nav": true,
+              "isMsiteBottomBarEnabled": true,
+              "enableMultiBottomBar": true,
+              "show_l1_nav": true
+            }
+          },
+          {
+            "abId": "STG|prestart|9c3e1cc1|h",
+            "appId": "Mapi",
+            "expId": "landmark_ab_geocode",
+            "metadata": {
+              "GeoLandmarkEnabled": false,
+              "GeoLandmarkCount": 1,
+              "LandmarkThresholdMeters": 1
+            }
+          },
+          {
+            "abId": "STG|prestart|f083a305|h",
+            "appId": "Mapi",
+            "expId": "msite_parallel_fetch",
+            "metadata": {
+              "msite_parallel_fetch": false
+            }
+          },
+          {
+            "abId": "STG|launchedGroup|67bc981e|h",
+            "appId": "Mapi",
+            "expId": "pp_revamp_desktop_v2",
+            "metadata": {
+              "enableOneviewHLRevamp": true,
+              "enableOneviewGroceryRevamp": true,
+              "enableOneviewFlipkartRevamp": true
+            }
+          },
+          {
+            "abId": "STG|prestart|6f384292|h",
+            "appId": "Mapi",
+            "expId": "msite_svg_optimsiation",
+            "metadata": {
+              "msite_svg_optimisation": false
+            }
+          },
+          {
+            "abId": "STG|launchedGroup|6699b962|h",
+            "appId": "Mapi",
+            "expId": "android_cmcd",
+            "metadata": {
+              "isCmcdEnabled": true
+            }
+          },
+          {
+            "abId": "STG|launchedGroup|16882251|h",
+            "appId": "Mapi",
+            "expId": "ov_cart_revamp_test",
+            "metadata": {
+              "enableOneViewCartRevamp": true
+            }
+          },
+          {
+            "abId": "STG|prestart|0b46a304|h",
+            "appId": "Mapi",
+            "expId": "msite_pp_fullpage_scrollable",
+            "metadata": {
+              "msitePPFullPageScroll": false
+            }
+          },
+          {
+            "abId": "STG|inlineTargetingRules|2ddcc905|h",
+            "appId": "Mapi",
+            "expId": "web_infinite_scroll_improvement",
+            "metadata": {
+              "webInfiniteScrollUXImp": false
+            }
+          },
+          {
+            "abId": "STG|launchedGroup|8b7690a1|h",
+            "appId": "Mapi",
+            "expId": "desktop_infinite_scroll_imp",
+            "metadata": {
+              "desktopInfiniteScrollUXImp": true
+            }
+          },
+          {
+            "abId": "STG|2MnPfvpcaqX95jo1Km9bIQ|e8d48ac8|h",
+            "appId": "Mapi",
+            "expId": "web_dummy_ab_2",
+            "metadata": {
+              "dummy_msite_var2": false
+            }
+          },
+          {
+            "abId": "STG|inlineTargetingRules|4afc7811|h",
+            "appId": "Mapi",
+            "expId": "msite_esm_bundler",
+            "metadata": {
+              "includeEsmBundle": false
+            }
+          },
+          {
+            "abId": "STG|launchedGroup|3b9de79b|h",
+            "appId": "Mapi",
+            "expId": "web_maps_revamp",
+            "metadata": {
+              "web_maps_revamp": true
+            }
+          },
+          {
+            "abId": "STG|prestart|8ffebe0c|h",
+            "appId": "Mapi",
+            "expId": "mhp_ghp_image_improvement",
+            "metadata": {
+              "isImageDimensionProviderEnabled": false
+            }
+          },
+          {
+            "abId": "STG|prestart|65ff5e01|h",
+            "appId": "Mapi",
+            "expId": "msite_module_preload",
+            "metadata": {
+              "isModulePreloadEnabled": false
+            }
+          },
+          {
+            "abId": "STG|prestart|24312d2b|h",
+            "appId": "Mapi",
+            "expId": "minutes_snb_changes",
+            "metadata": {
+              "openLhsViaD1Hl": ""
+            }
+          },
+          {
+            "abId": "STG|prestart|236e3306|h",
+            "appId": "Mapi",
+            "expId": "image_view_optimization",
+            "metadata": {
+              "isImageDimensionProviderPresent": false
+            }
+          },
+          {
+            "abId": "STG|prestart|bb9495cf|h",
+            "appId": "Mapi",
+            "expId": "cross_sell_m1_essentials-explore",
+            "metadata": {
+              "crossCart": "control"
+            }
+          },
+          {
+            "abId": "STG|prestart|0b6e51e5|h",
+            "appId": "Mapi",
+            "expId": "payments_request_parellisation",
+            "metadata": {
+              "isParallisationEnabled": false
+            }
+          },
+          {
+            "abId": "STG|prestart|bbfd365d|h",
+            "appId": "Mapi",
+            "expId": "ai_mode_blue_only_pp_ab5",
+            "metadata": {
+              "enablePPLazyLoadWidgets": false
+            }
+          },
+          {
+            "abId": "STG|prestart|91437ef2|h",
+            "appId": "Mapi",
+            "expId": "address_autosuggest_sync_exp",
+            "metadata": {
+              "sync_autosuggest": false
+            }
+          },
+          {
+            "abId": "STG|prestart|1f2d5d70|h",
+            "appId": "Mapi",
+            "expId": "sampling_nr_log",
+            "metadata": {
+              "trunkLogSampleRate": 1
+            }
+          },
+          {
+            "abId": "STG|inlineTargetingRules|5eadf2b8|h",
+            "appId": "Mapi",
+            "expId": "pp_lcp_placeholder",
+            "metadata": {
+              "enablePlaceholderLcpShimmer": false
+            }
+          },
+          {
+            "abId": "STG|prestart|07df3769|h",
+            "appId": "Mapi",
+            "expId": "direct_api_from_browser_ab",
+            "metadata": {
+              "enableDirectApiFromBrowser": false
+            }
+          },
+          {
+            "abId": "STG|3K8x5vXxMkhZ7qwWzD36iB|28143b96|h",
+            "appId": "Mapi",
+            "expId": "address_reverse_geocode_v2",
+            "metadata": {
+              "structured_address_extraction": true
+            }
+          },
+          {
+            "abId": "STG|prestart|e79d2519|h",
+            "appId": "Mapi",
+            "expId": "search_inception_msite",
+            "metadata": {
+              "enableSnBInceptionRevampMsite": false
+            }
+          },
+          {
+            "abId": "STG|prestart|7a959839|h",
+            "appId": "Mapi",
+            "expId": "vm-load-optimization",
+            "metadata": {
+              "enableParallelStartApplication": false,
+              "enableSplashReactFragmentPrewarm": false
+            }
+          },
+          {
+            "abId": "STG|prestart|b0b05d58|h",
+            "appId": "Mapi",
+            "expId": "fk_address_gmapsapis_backend",
+            "metadata": {
+              "API_backend_Call": false,
+              "Geocode_API_V3": true,
+              "Search_API_V3": true
+            }
+          },
+          {
+            "abId": "STG|prestart|466d170f|h",
+            "appId": "Mapi",
+            "expId": "shopsy2_msiterevamp",
+            "metadata": {
+              "isMsiteRevamp": false
+            }
+          }
+        ]
+      },
+      "cart": {
+        "items": []
+      },
+      "location": {
+        "communityStore": null,
+        "selectedLocation": null
+      },
+      "lockinResponse": {
+        "flipkartLogoAction": {
+          "action": null,
+          "constraints": null,
+          "customTrackingEvents": null,
+          "fallback": null,
+          "loginType": "LOGIN_NOT_REQUIRED",
+          "nonWidgetizeRedirection": null,
+          "omnitureData": null,
+          "omnitureTracking": null,
+          "originalUrl": "/plus",
+          "params": {
+            "valid": true,
+            "screenName": "LOYALTY_PAGE"
+          },
+          "requiredPermissionType": null,
+          "screenType": "multiWidgetPage",
+          "storeValue": {},
+          "subType": null,
+          "tracking": {},
+          "triggerExtraStandardEvents": null,
+          "type": "NAVIGATION",
+          "url": "/plus",
+          "validationMeta": null,
+          "widgetTracking": null,
+          "widgetizedActions": null
+        },
+        "userMembershipState": "NON_LOGGED_IN"
+      },
+      "userCohortResponse": {
+        "segmentIds": null
+      },
+      "versions": {
+        "abResponse": -1433458382,
+        "abVariables": 0,
+        "accountDetails": 0,
+        "cart": 569507978,
+        "location": 23273,
+        "lockinResponse": 558589207,
+        "notifications": 0,
+        "userAccountState": 0,
+        "userService": 0,
+        "wishlist": 0
+      }
+    }
+  },
+  "SESSION": {
+    "accountId": null,
+    "asn": null,
+    "at": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6IjFkOTYzYzUwLTM0YjctNDA1OC1iMTNmLWY2NDhiODFjYTBkYSJ9.eyJleHAiOjE3ODk5NDQwMTgsImlhdCI6MTc4ODIxNjAxOCwiaXNzIjoia2V2bGFyIiwianRpIjoiMGRjY2NmMTAtOWEyZC00ODZjLWIxZWMtMGJlZWFhMmU3OTg5IiwidHlwZSI6IkFUIiwiZElkIjoiVEkxNzg4MjE2MDE2ODgwMDAwODUwNzc0MjMwNTQ0NzQ3Mzg0NjU5ODAzNTY3MjQzMTc5MjM1NjcxODg3OTgwODEyOTQiLCJrZXZJZCI6IlZJNzQ1OTEwQkVERjNCNDRFNUIyOTg4MUNGM0NGRDg3QTgiLCJ0SWQiOiJtYXBpIiwidnMiOiJMTyIsInoiOiJDSCIsIm0iOnRydWUsImdlbiI6MywiZG9tIjoiRkxJUEtBUlQifQ.DCaaEfjbVHkt_DRfoME3i9JEWGUhD6UgfRMQ-2kw-XU",
+    "ec": null,
+    "email": null,
+    "firstName": null,
+    "flipkartFirstUser": false,
+    "isLoggedIn": false,
+    "kAction": null,
+    "lastName": null,
+    "nsid": "3.VI745910BEDF3B44E5B29881CF3CFD87A8.1788216019374.VI745910BEDF3B44E5B29881CF3CFD87A8",
+    "rt": null,
+    "secureToken": "VI745910BEDF3B44E5B29881CF3CFD87A8:VI745910BEDF3B44E5B29881CF3CFD87A8",
+    "sn": "VI745910BEDF3B44E5B29881CF3CFD87A8.TOK5C1F9C7E72334B948FA680601AC45288.1788216019345.LO",
+    "ts": 0,
+    "twoFa": false,
+    "vid": "VI745910BEDF3B44E5B29881CF3CFD87A8"
+  },
+  "STATUS_CODE": 200
+}

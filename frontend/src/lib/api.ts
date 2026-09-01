@@ -1,5 +1,5 @@
 export interface ProductInfo {
-  status: "in_stock" | "out_of_stock" | "not_carried" | "error"
+  status: "in_stock" | "out_of_stock" | "not_carried" | "error" | "unknown"
   name: string | null
   brand: string | null
   image_url: string | null
@@ -52,6 +52,7 @@ export interface StoreResult {
   price: number | null
   mrp: number | null
   platform?: string
+  verified?: boolean
 }
 
 export interface SearchSummary {

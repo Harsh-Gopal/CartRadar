@@ -1,0 +1,41 @@
+{
+  "CACHE_INVALIDATION_TTL": "0",
+  "META_INFO": {
+    "abContext": {
+      "abWrapper": [
+        {
+          "abId": "STG|launchedGroup|46aeb36d|h"
+        }
+      ]
+    },
+    "appConfigHash": null,
+    "clientConfigHashMap": null,
+    "dcInfo": null,
+    "omnitureInfo": null
+  },
+  "REQUEST": null,
+  "REQUEST-ID": "2f0a5137-7593-455b-ac14-a9144ca0bd78",
+  "RESPONSE": {
+    "message": "PN callback saved successfully."
+  },
+  "SESSION": {
+    "accountId": null,
+    "asn": null,
+    "at": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6IjFkOTYzYzUwLTM0YjctNDA1OC1iMTNmLWY2NDhiODFjYTBkYSJ9.eyJleHAiOjE3ODk5NDQwMTgsImlhdCI6MTc4ODIxNjAxOCwiaXNzIjoia2V2bGFyIiwianRpIjoiMGRjY2NmMTAtOWEyZC00ODZjLWIxZWMtMGJlZWFhMmU3OTg5IiwidHlwZSI6IkFUIiwiZElkIjoiVEkxNzg4MjE2MDE2ODgwMDAwODUwNzc0MjMwNTQ0NzQ3Mzg0NjU5ODAzNTY3MjQzMTc5MjM1NjcxODg3OTgwODEyOTQiLCJrZXZJZCI6IlZJNzQ1OTEwQkVERjNCNDRFNUIyOTg4MUNGM0NGRDg3QTgiLCJ0SWQiOiJtYXBpIiwidnMiOiJMTyIsInoiOiJDSCIsIm0iOnRydWUsImdlbiI6MywiZG9tIjoiRkxJUEtBUlQifQ.DCaaEfjbVHkt_DRfoME3i9JEWGUhD6UgfRMQ-2kw-XU",
+    "ec": null,
+    "email": null,
+    "firstName": null,
+    "flipkartFirstUser": false,
+    "isLoggedIn": false,
+    "kAction": null,
+    "lastName": null,
+    "nsid": "3.VI745910BEDF3B44E5B29881CF3CFD87A8.1788216018489.VI745910BEDF3B44E5B29881CF3CFD87A8",
+    "rt": null,
+    "secureToken": "VI745910BEDF3B44E5B29881CF3CFD87A8:VI745910BEDF3B44E5B29881CF3CFD87A8",
+    "sn": "VI745910BEDF3B44E5B29881CF3CFD87A8.TOKACE75089E4E2429EB9A621DB3347FA41.1788216018479.LO",
+    "ts": 0,
+    "twoFa": false,
+    "vid": "VI745910BEDF3B44E5B29881CF3CFD87A8"
+  },
+  "STATUS_CODE": 200
+}
