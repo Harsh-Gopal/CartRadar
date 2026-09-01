@@ -12,6 +12,8 @@
 
 *Built and maintained by [@Harsh-Gopal](https://github.com/Harsh-Gopal)*
 
+⭐ **If you find Cart Radar useful, please consider giving it a star on GitHub!** ⭐
+
 </div>
 
 > [!NOTE]
@@ -85,14 +87,14 @@ Instead of just checking your nearest store, Cart Radar performs a **hex-grid sw
 
 | Platform | Stock Check | Area Sweep | Notes |
 |---|---|---|---|
-| **Zepto** | ✅ | ✅ | Hex-grid sweep across 5–30 km |
+| **Zepto** | ✅ | ✅ | Playwright Hybrid Sweep architecture |
 | **Swiggy Instamart** | ✅ | ✅ | Multi-zone sweep |
 | **BigBasket** | ✅ | ✅ | Cookie-based location spoofing |
 | **Blinkit** | ✅ | ✅ | Playwright-based |
+| **Flipkart Minutes** | ✅ | ✅ | Robust metadata & cached coordinates |
 | **BB Now** | ✅ | ❌ | Express delivery only |
 | **Tata Neu** | 🚧 | 🚧 | Planned |
 | **Amazon Fresh** | 🚧 | 🚧 | Planned |
-| **Flipkart Minutes** | 🚧 | 🚧 | Planned |
 
 ---
 
@@ -122,6 +124,13 @@ cd CartRadar/cart-radar
 ```bash
 ./dev.sh
 ```
+# Kill anything on the dev ports first (run this whenever you see port conflicts)
+lsof -ti:8000,5173,5174 | xargs kill -9
+
+# Then start fresh
+./dev.sh
+
+
 
 This starts the **FastAPI backend** (port 8000) and the **Vite dev frontend** (port 5173) together. Press Ctrl+C to stop both.
 
@@ -197,6 +206,7 @@ cart-radar/
 
 ### Key Design Decisions
 
+- **Zepto Hybrid Sweep Architecture** — Zepto employs aggressive WAF/Datadome protection. Cart Radar uses an organic Playwright Chromium context to seamlessly pass the WAF and extract session cookies. These verified cookies are then passed to a highly concurrent `httpx.AsyncClient` that sweeps the hex-grid at extreme speeds (reducing sweep time from 100s+ to under 5s) while remaining completely stealthy and WAF-compliant.
 - **SSE Streaming** — Results stream in real-time via Server-Sent Events. Users see stores appear one by one as the sweep progresses, instead of waiting for all results.
 - **Hex-Grid Sweep** — Store discovery uses a hexagonally-packed grid to minimize gaps and overlap while covering a circular area efficiently.
 - **SQLite Store Cache** — Discovered stores and probed coordinates are cached locally (90-day TTL) to speed up repeat searches.
@@ -239,7 +249,7 @@ See [`docs/BUGS.md`](docs/BUGS.md) for the full bug tracker and [`docs/AUDIT_REP
 
 ### Critical (Fixed ✅)
 - **Geocode 500 error** — `httpx` import was missing in `main.py`, causing HTTP 500 on all Nominatim geocoding fallback paths. Fixed.
-- **Zepto WAF bypass** — Zepto blocks automated requests (HTTP 202). Fallback to `SAMPLE_STORE_ID` for product preview. Store sweep still works.
+- **Zepto WAF bypass & Missing Images** — Zepto's aggressive Datadome WAF and metadata-stripping APIs caused slow sweeps and missing images. Completely solved via the new Hybrid Playwright Sweep and dark-store metadata fallback.
 
 ### Planned Improvements
 - [ ] Code-split JS bundle (currently 580KB — Leaflet is the main contributor)
@@ -258,7 +268,6 @@ Cart Radar is under active development. Here's what's planned next — contribut
 ### Platform Expansion
 - **Tata Neu Grocery / BB Now sweep** — Scaffolding in place; needs anti-bot bypass for full geographic sweep
 - **Amazon Fresh** — Pincode-based availability check (API reverse-engineering in progress)
-- **Flipkart Minutes** — Early-stage research; aggressive WAF
 
 ### Performance
 - **Code-split JS bundle** — Leaflet and the map panel are lazy-loaded to cut initial load from ~580KB → ~200KB
