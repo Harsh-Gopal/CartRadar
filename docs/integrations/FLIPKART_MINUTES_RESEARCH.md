@@ -56,9 +56,19 @@ URL `/product/p/itme?pid=...` format avoids the CAPTCHA that `/p/itm` triggers.
 **Key insight:** `wait_for_url()` is ESSENTIAL. A fixed sleep is insufficient and
 causes false negatives (returning `not_carried` even when serviceable).
 
+## 5. Grid Scanning / Sweep Architecture (Added 2026-09-01)
+
+Flipkart Minutes does not publicly expose a `store_id` (like Zepto or BigBasket does). 
+To support CartRadar's radius hex-grid scanning, we implemented a virtual store coverage system:
+1. `resolve_store(lat, lng)` executes the GPS-based browser check.
+2. If serviceable, it returns a virtual `store_id` format: `fm_coverage_{lat}_{lng}`.
+3. The extracted `ProductResult` is cached internally by `FlipkartMinutesClient` so that the subsequent call to `product_at_store()` does not spin up a second browser instance.
+4. Concurrency is limited to `2` Playwright contexts (`asyncio.Semaphore(2)`) to prevent OOM errors during a heavy radius sweep.
+5. `main.py` explicitly skips Flipkart Minutes during the fast `check_serviceability` API route, preventing the UI from briefly flashing a red "Not delivering here" warning before the sweep completes.
+
 ---
 
-## 5. Price Extraction
+## 6. Price Extraction
 
 Flipkart Minutes product pages contain **NO `application/ld+json`** (unlike standard
 Flipkart). Price is in the React DOM using obfuscated CSS class names.

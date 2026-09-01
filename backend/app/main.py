@@ -197,9 +197,9 @@ async def check_serviceability(
     results: dict = {}
 
     async def _check(name: str, client: PlatformClient) -> None:
-        # Skip Blinkit — its resolve_store uses Playwright and is too slow/heavy
+        # Skip Playwright-based platforms — their resolve_store is too slow/heavy
         # for a quick availability pre-check.
-        if name == "blinkit":
+        if name in ("blinkit", "flipkart", "flipkart_minutes"):
             results[name] = {"source": "skipped", "is_open": None}
             return
         try:

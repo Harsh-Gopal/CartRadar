@@ -270,6 +270,13 @@ class FlipkartMinutesClient(PlatformClient):
     and type it into the address search input on the preview page.
     """
 
+    def __init__(self):
+        super().__init__()
+        # Cache for product results fetched during resolve_store
+        self._result_cache: dict[str, ProductResult] = {}
+        # Concurrency limit to prevent OOM
+        self._sem = asyncio.Semaphore(2)
+
     @property
     def platform_name(self) -> str:
         return "flipkart_minutes"
@@ -280,7 +287,7 @@ class FlipkartMinutesClient(PlatformClient):
 
     @property
     def supports_sweep(self) -> bool:
-        return False
+        return True
 
     @property
     def supports_geocoding(self) -> bool:
@@ -292,99 +299,118 @@ class FlipkartMinutesClient(PlatformClient):
     async def resolve_share_link(self, url: str) -> str | None:
         return None
 
-    async def product_at_location(self, product_id: str, lat: float, lng: float) -> ProductResult:
-        browser = await _get_browser()
-        product_url = f"https://www.flipkart.com/product/p/itme?pid={product_id}&marketplace=HYPERLOCAL"
-
-        # ── Strategy 1: GPS injection + wait_for_url navigation ───────────────
-        ctx = await browser.new_context(
-            user_agent=_UA,
-            geolocation={"longitude": lng, "latitude": lat},
-            permissions=["geolocation"],
-        )
-        page = await ctx.new_page()
-        try:
-            await page.goto(product_url, wait_until="domcontentloaded", timeout=20000)
-            # The "Use my current location" button is rendered by React asynchronously —
-            # needs 3-4 seconds after domcontentloaded to appear in the DOM.
-            await page.wait_for_timeout(4000)
-
-            if not _is_unserviceable(page.url):
-                # Already on product page (location already set from a previous visit)
-                log.info("Flipkart Minutes: landed directly on product page: %s", page.url)
-                return await _extract_product_result(page)
-
-            # On preview/address-selection page — click GPS button
-            loc_btns = await page.locator("text=/Use my current location/i").all()
-            if loc_btns:
-                log.info("Flipkart Minutes: clicking 'Use my current location'")
-                await loc_btns[0].click(timeout=5000)
-
-                # KEY FIX: wait_for_url() until we leave the preview page
-                # This properly waits for Flipkart's async location resolution + navigation
-                try:
-                    await page.wait_for_url(
-                        lambda url: not _is_unserviceable(url),
-                        timeout=12000,
-                    )
-                    log.info("Flipkart Minutes: URL changed to product page — SERVICEABLE")
-                    return await _extract_product_result(page)
-                except Exception:
-                    # Timeout: URL didn't change — area unserviceable via GPS
-                    log.info("Flipkart Minutes: GPS location not accepted — still on preview page")
-
-            # ── Strategy 2: Pincode entry fallback ────────────────────────────
-            # Reverse-geocode lat/lng to a pincode, type it in the search input
-            pincode = await _reverse_geocode_pincode(lat, lng)
-            log.info("Flipkart Minutes: trying pincode fallback, pincode=%s", pincode)
-
-            if pincode:
-                inp_sel = "input[placeholder*='Search'], input[placeholder*='area'], input[placeholder*='pin code'], input[placeholder*='pincode']"
-                inputs = await page.locator(inp_sel).all()
-
-                for inp in inputs:
-                    try:
-                        await inp.click()
-                        await inp.fill(pincode)
-                        # Wait for autocomplete suggestions
-                        await page.wait_for_timeout(2000)
-
-                        suggestions = await page.locator(
-                            "li[role='option'], [class*='Suggestion'], [class*='suggestion'], [class*='listItem']"
-                        ).all()
-                        log.info("Flipkart Minutes: pincode suggestions count=%d", len(suggestions))
-
-                        if suggestions:
-                            await suggestions[0].click(timeout=5000)
-                        else:
-                            await inp.press("Enter")
-
-                        try:
-                            await page.wait_for_url(
-                                lambda url: not _is_unserviceable(url),
-                                timeout=10000,
-                            )
-                            log.info("Flipkart Minutes: pincode strategy navigated to product page")
-                            return await _extract_product_result(page)
-                        except Exception:
-                            log.info("Flipkart Minutes: pincode strategy also unserviceable")
-                        break
-                    except Exception as e:
-                        log.debug("Flipkart Minutes: pincode input error: %s", e)
-
-            # Both strategies failed — genuinely unserviceable
-            return ProductResult(status="not_carried")
-
-        except Exception as e:
-            log.warning("Flipkart Minutes extraction failed: %s", e)
-            return ProductResult(status="error")
-        finally:
-            await ctx.close()
-
     async def resolve_store(
         self, lat: float, lng: float, product_id: str | None = None
     ) -> StoreResolution:
-        return StoreResolution(serviceable=False)
+        if not product_id:
+            return StoreResolution(serviceable=False)
+            
+        store_id = f"fm_coverage_{round(lat, 3)}_{round(lng, 3)}"
+
+        # If we already resolved and cached this, skip
+        if f"{product_id}_{store_id}" in self._result_cache:
+            return StoreResolution(
+                serviceable=True,
+                store_id=store_id,
+                store_name="Flipkart Minutes Coverage Area",
+                eta_minutes=None,
+                city=None,
+            )
+
+        browser = await _get_browser()
+        product_url = f"https://www.flipkart.com/product/p/itme?pid={product_id}&marketplace=HYPERLOCAL"
+
+        async with self._sem:
+            # ── Strategy 1: GPS injection + wait_for_url navigation ───────────────
+            ctx = await browser.new_context(
+                user_agent=_UA,
+                geolocation={"longitude": lng, "latitude": lat},
+                permissions=["geolocation"],
+            )
+            page = await ctx.new_page()
+            try:
+                await page.goto(product_url, wait_until="domcontentloaded", timeout=20000)
+                # The "Use my current location" button is rendered by React asynchronously
+                await page.wait_for_timeout(4000)
+
+                if not _is_unserviceable(page.url):
+                    # Already on product page (location already set from a previous visit)
+                    log.info("Flipkart Minutes: landed directly on product page: %s", page.url)
+                    result = await _extract_product_result(page)
+                    self._result_cache[f"{product_id}_{store_id}"] = result
+                    return StoreResolution(
+                        serviceable=True, store_id=store_id, store_name="Flipkart Minutes Coverage Area", city=None
+                    )
+
+                # On preview/address-selection page — click GPS button
+                loc_btns = await page.locator("text=/Use my current location/i").all()
+                if loc_btns:
+                    log.info("Flipkart Minutes: clicking 'Use my current location'")
+                    await loc_btns[0].click(timeout=5000)
+
+                    # KEY FIX: wait_for_url() until we leave the preview page
+                    try:
+                        await page.wait_for_url(
+                            lambda url: not _is_unserviceable(url),
+                            timeout=12000,
+                        )
+                        log.info("Flipkart Minutes: URL changed to product page — SERVICEABLE")
+                        result = await _extract_product_result(page)
+                        self._result_cache[f"{product_id}_{store_id}"] = result
+                        return StoreResolution(
+                            serviceable=True, store_id=store_id, store_name="Flipkart Minutes Coverage Area", city=None
+                        )
+                    except Exception:
+                        log.info("Flipkart Minutes: GPS location not accepted — still on preview page")
+
+                # ── Strategy 2: Pincode entry fallback ────────────────────────────
+                pincode = await _reverse_geocode_pincode(lat, lng)
+                log.info("Flipkart Minutes: trying pincode fallback, pincode=%s", pincode)
+
+                if pincode:
+                    inp_sel = "input[placeholder*='Search'], input[placeholder*='area'], input[placeholder*='pin code'], input[placeholder*='pincode']"
+                    inputs = await page.locator(inp_sel).all()
+
+                    for inp in inputs:
+                        try:
+                            await inp.click()
+                            await inp.fill(pincode)
+                            await page.wait_for_timeout(2000)
+
+                            suggestions = await page.locator(
+                                "li[role='option'], [class*='Suggestion'], [class*='suggestion'], [class*='listItem']"
+                            ).all()
+                            
+                            if suggestions:
+                                await suggestions[0].click(timeout=5000)
+                            else:
+                                await inp.press("Enter")
+
+                            try:
+                                await page.wait_for_url(
+                                    lambda url: not _is_unserviceable(url),
+                                    timeout=10000,
+                                )
+                                log.info("Flipkart Minutes: pincode strategy navigated to product page")
+                                result = await _extract_product_result(page)
+                                self._result_cache[f"{product_id}_{store_id}"] = result
+                                return StoreResolution(
+                                    serviceable=True, store_id=store_id, store_name="Flipkart Minutes Coverage Area", city=None
+                                )
+                            except Exception:
+                                log.info("Flipkart Minutes: pincode strategy also unserviceable")
+                            break
+                        except Exception as e:
+                            log.debug("Flipkart Minutes: pincode input error: %s", e)
+
+                # Both strategies failed — genuinely unserviceable
+                return StoreResolution(serviceable=False)
+
+            except Exception as e:
+                log.warning("Flipkart Minutes extraction failed: %s", e)
+                raise PlatformError(f"Flipkart Minutes error: {e}")
+            finally:
+                await ctx.close()
 
     async def product_at_store(
         self,
@@ -393,4 +419,20 @@ class FlipkartMinutesClient(PlatformClient):
         lat: float | None = None,
         lng: float | None = None,
     ) -> ProductResult:
-        return ProductResult(status="error")
+        key = f"{product_id}_{store_id}"
+        if key in self._result_cache:
+            return self._result_cache.pop(key)
+        
+        # If not cached, we must resolve it again.
+        if lat is not None and lng is not None:
+            res = await self.resolve_store(lat, lng, product_id)
+            if res.serviceable and res.store_id == store_id:
+                return self._result_cache.pop(key, ProductResult(status="error"))
+            
+        return ProductResult(status="not_carried")
+
+    async def product_at_location(self, product_id: str, lat: float, lng: float) -> ProductResult:
+        store = await self.resolve_store(lat, lng, product_id=product_id)
+        if not store.serviceable or not store.store_id:
+            return ProductResult(status="not_carried")
+        return await self.product_at_store(product_id, store.store_id, lat=lat, lng=lng)
