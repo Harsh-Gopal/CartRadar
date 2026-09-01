@@ -97,8 +97,9 @@ def extract_product_id(text: str) -> tuple[str | None, str | None]:
         m = BBNOW_PRODUCT_RE.search(text)
         return ("bbnow", m.group(1)) if m else ("bbnow", None)
     elif platform == "flipkart" or platform == "flipkart_minutes":
-        m = FLIPKART_PRODUCT_RE.search(text)
-        return (platform, m.group(1)) if m else (platform, None)
+        # Extract pid from query parameters, fallback to regex
+        pid = _extract_flipkart_id(text)
+        return (platform, pid) if pid else (platform, None)
 
     # Not a known platform URL — try raw pvid  extraction (Zepto-style)
     pid = _extract_zepto_id(text)
@@ -124,6 +125,19 @@ def _extract_zepto_id(text: str) -> str | None:
                 return m.group(0).lower()
     return None
 
+
+def _extract_flipkart_id(text: str) -> str | None:
+    """Pull a Flipkart pid out of a URL or pasted text."""
+    try:
+        qs = parse_qs(urlparse(text.strip()).query)
+        if "pid" in qs and qs["pid"]:
+            return qs["pid"][0]
+    except ValueError:
+        pass
+    m = FLIPKART_PRODUCT_RE.search(text)
+    if m:
+        return m.group(1)
+    return None
 
 def first_url(text: str) -> str | None:
     """Find the first http(s) URL in a pasted share blob."""
