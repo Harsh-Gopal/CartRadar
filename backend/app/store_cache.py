@@ -101,18 +101,20 @@ class StoreCache:
         city: str | None, now: str, platform: str = "zepto"
     ) -> Store:
         row = self._db.execute(
-            "SELECT lat, lng, probe_count FROM stores WHERE id = ? AND platform = ?",
+            "SELECT lat, lng, probe_count, name, city FROM stores WHERE id = ? AND platform = ?",
             (store_id, platform),
         ).fetchone()
         if row:
-            olat, olng, n = row
+            olat, olng, n, r_name, r_city = row
             nlat, nlng = (olat * n + lat) / (n + 1), (olng * n + lng) / (n + 1)
+            final_name = store_name or r_name
+            final_city = city or r_city
             self._db.execute(
                 "UPDATE stores SET lat=?, lng=?, probe_count=?, last_seen_at=?, "
-                "name=COALESCE(?, name), city=COALESCE(?, city) WHERE id=? AND platform=?",
-                (nlat, nlng, n + 1, now, store_name, city, store_id, platform),
+                "name=?, city=? WHERE id=? AND platform=?",
+                (nlat, nlng, n + 1, now, final_name, final_city, store_id, platform),
             )
-            return Store(store_id, store_name, city, nlat, nlng, platform)
+            return Store(store_id, final_name, final_city, nlat, nlng, platform)
         self._db.execute(
             "INSERT INTO stores (id, platform, name, city, lat, lng, probe_count, discovered_at, last_seen_at) "
             "VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)",

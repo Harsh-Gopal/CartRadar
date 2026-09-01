@@ -161,28 +161,14 @@ async def _extract_product_result(page) -> ProductResult:
     # ld+json missing or no price — try DOM (Flipkart Minutes product pages)
     dom_price = await page.evaluate(_DOM_PRICE_JS)
     if dom_price:
-        # Also extract MRP (v1zwn20) separately
-        dom_mrp = await page.evaluate(r'''() => {
-            const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null);
-            let node;
-            while ((node = walker.nextNode())) {
-                const t = node.textContent.trim();
-                if (/^₹\d/.test(t)) {
-                    let el = node.parentElement;
-                    for (let i = 0; i < 4; i++) {
-                        if (!el) break;
-                        if (el.matches("div.v1zwn20")) {
-                            const num = parseFloat(t.replace(/[^\d.]/g, ""));
-                            if (!isNaN(num) && num > 0 && num < 500000) return num;
-                        }
-                        el = el.parentElement;
-                    }
-                }
-            }
-            return null;
-        }''')
-        log.info("Flipkart: price=%s mrp=%s (DOM)", dom_price, dom_mrp)
-        return ProductResult(status="in_stock", price=dom_price, mrp=dom_mrp or dom_price)
+        log.info("Flipkart Minutes: price=%s (DOM)", dom_price)
+        return ProductResult(
+            status="in_stock", 
+            price=dom_price, 
+            mrp=dom_price,
+            name=None,
+            image_url=None
+        )
 
     log.warning("Flipkart: on product page but price not found — returning out_of_stock")
     return ProductResult(status="out_of_stock")
@@ -419,15 +405,17 @@ class FlipkartMinutesClient(PlatformClient):
         lat: float | None = None,
         lng: float | None = None,
     ) -> ProductResult:
-        key = f"{product_id}_{store_id}"
-        if key in self._result_cache:
-            return self._result_cache.pop(key)
+        # Check cache via original generated key since resolve_store generated it
+        orig_key = f"{product_id}_fm_coverage_{round(lat or 0, 3)}_{round(lng or 0, 3)}"
+        if orig_key in self._result_cache:
+            return self._result_cache.pop(orig_key)
         
-        # If not cached, we must resolve it again.
+        # Fallback if not cached
         if lat is not None and lng is not None:
             res = await self.resolve_store(lat, lng, product_id)
-            if res.serviceable and res.store_id == store_id:
-                return self._result_cache.pop(key, ProductResult(status="error"))
+            if res.serviceable:
+                orig_key = f"{product_id}_fm_coverage_{round(lat, 3)}_{round(lng, 3)}"
+                return self._result_cache.pop(orig_key, ProductResult(status="error"))
             
         return ProductResult(status="not_carried")
 

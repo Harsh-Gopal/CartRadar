@@ -199,7 +199,7 @@ async def check_serviceability(
     async def _check(name: str, client: PlatformClient) -> None:
         # Skip Playwright-based platforms — their resolve_store is too slow/heavy
         # for a quick availability pre-check.
-        if name in ("blinkit", "flipkart", "flipkart_minutes"):
+        if name in ("blinkit", "flipkart", "flipkart_minutes", "zepto"):
             results[name] = {"source": "skipped", "is_open": None}
             return
         try:
@@ -261,16 +261,25 @@ async def resolve_link(body: ResolveRequest, request: Request):
     # Fetch a product card for display
     try:
         if platform_name == "zepto":
-            # Zepto needs a store context to fetch product details
-            store_id = SAMPLE_STORE_ID
-            if body.lat is not None and body.lng is not None:
-                try:
-                    home = await client.resolve_store(body.lat, body.lng)
-                    if home.serviceable and home.store_id:
-                        store_id = home.store_id
-                except PlatformError:
-                    pass
-            product = await client.product_at_store(product_id, store_id)
+            # Zepto uses Playwright to organically fetch metadata & handle WAF
+            lat = body.lat if body.lat is not None else 28.6139
+            lng = body.lng if body.lng is not None else 77.2090
+            try:
+                res = await client.fetch_availability_playwright(lat, lng, product_id)
+                product = res.get("product")
+                if not product and res.get("error_reason"):
+                    # If we hit a WAF/Playwright error, return a fallback so the UI doesn't 500
+                    from .platforms.base import ProductResult
+                    product = ProductResult(status="error", name="Zepto Product", image_url="")
+            except Exception as e:
+                log.warning("Zepto metadata fetch via Playwright failed: %s", e)
+                from .platforms.base import ProductResult
+                product = ProductResult(status="error", name="Zepto Product", image_url="")
+        elif platform_name == "flipkart_minutes":
+            # Delegate metadata extraction to the robust normal Flipkart client (uses ld+json API)
+            # Flipkart Minutes and standard Flipkart share the same catalog metadata
+            fk_client = get_client("flipkart", request)
+            product = await fk_client.product_at_location(product_id, body.lat or 28.6139, body.lng or 77.2090)
         else:
             # Other platforms: try product_at_location if coords are available
             if body.lat is not None and body.lng is not None:

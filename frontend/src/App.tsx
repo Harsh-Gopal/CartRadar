@@ -28,6 +28,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion"
+import { ZeptoResultCard } from "@/components/zepto-result"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -646,7 +647,7 @@ export function App() {
                 </CardTitle>
                 {!resolved && (
                   <CardDescription>
-                    Paste a link from Zepto, Instamart, BigBasket, Blinkit, or BB Now
+                    Paste a link from Zepto, Instamart, BigBasket, Blinkit, or Flipkart Minutes
                     — it loads automatically.
                   </CardDescription>
                 )}
@@ -659,7 +660,7 @@ export function App() {
                     </InputGroupAddon>
                     <InputGroupInput
                       id="link"
-                      placeholder="Paste a product link from Zepto, Instamart, BigBasket, Blinkit, or BB Now…"
+                      placeholder="Paste a product link from Zepto, Instamart, BigBasket, Blinkit, or Flipkart Minutes…"
                       value={linkText}
                       aria-invalid={resolveError ? true : undefined}
                       onChange={(e) => setLinkText(e.target.value)}
@@ -1243,7 +1244,7 @@ export function App() {
               <AccordionTrigger className="text-sm">How does Cart Radar work?</AccordionTrigger>
               <AccordionContent className="flex flex-col gap-2 text-sm text-muted-foreground">
                 <p>
-                  Paste a product link from Zepto, Instamart, BigBasket, Blinkit, or BB Now (Tata Neu). Cart Radar
+                  Paste a product link from Zepto, Instamart, BigBasket, Blinkit, or Flipkart Minutes. Cart Radar
                   auto-detects the platform, then sweeps nearby dark stores / warehouses
                   using a hex-grid scan and checks live stock at each one.
                 </p>

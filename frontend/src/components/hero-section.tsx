@@ -3,8 +3,9 @@ import { Zap } from "lucide-react";
 const PLATFORMS = [
   { name: "Zepto", color: "#7C3AED" },
   { name: "Instamart", color: "#F97316" },
-  { name: "BigBasket", color: "#65A30D" },
-  { name: "Blinkit", color: "#EAB308" },
+  { name: "BigBasket", color: "#84CC16" },
+  { name: "Blinkit", color: "#FACC15" },
+  { name: "Flipkart Minutes", color: "#008CFF" }
 ];
 
 export function HeroSection() {
@@ -13,7 +14,7 @@ export function HeroSection() {
       {/* Icon badge */}
       <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-border/60 bg-card px-4 py-2 text-sm text-muted-foreground shadow-sm">
         <Zap size={14} className="text-primary" />
-        <span>Real-time stock across 4 platforms</span>
+        <span>Real-time stock across 5 platforms</span>
       </div>
 
       {/* Heading */}
@@ -25,7 +26,7 @@ export function HeroSection() {
       {/* Subtitle */}
       <p className="mt-4 max-w-lg text-base text-muted-foreground leading-relaxed">
         Paste any product link and we'll sweep nearby stores on Zepto, Instamart,
-        BigBasket, and Blinkit — showing you exactly where it's available.
+        BigBasket, Blinkit, and Flipkart Minutes — showing you exactly where it's available.
       </p>
 
       {/* Platform pills */}

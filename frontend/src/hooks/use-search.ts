@@ -16,6 +16,7 @@ export interface SearchState {
   summary: SearchSummary | null
   notice: string | null
   error: string | null
+  zeptoResult: any | null
   platform: string | null
 }
 
@@ -28,6 +29,7 @@ const INITIAL: SearchState = {
   summary: null,
   notice: null,
   error: null,
+  zeptoResult: null,
   platform: null,
 }
 
@@ -107,6 +109,9 @@ export function useSearch() {
               totalStores: Math.max(s.totalStores, s.results.length + 1),
               results: [...s.results, event],
             }))
+            break
+          case "zepto_result":
+            setState((s) => ({ ...s, zeptoResult: event }))
             break
           case "notice":
             setState((s) => ({ ...s, notice: event.message }))

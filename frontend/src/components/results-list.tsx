@@ -54,6 +54,7 @@ export function getPlatformFromResult(r: StoreResult): string {
   if (id.startsWith("bb_") || id.startsWith("bb-")) return "bigbasket"
   if (id.startsWith("blinkit_")) return "blinkit"
   if (id.startsWith("swiggy_")) return "swiggy"
+  if (id.startsWith("fm_")) return "flipkart_minutes"
   if (/^\d+$/.test(id)) return "swiggy"
   return "zepto"
 }
@@ -63,6 +64,7 @@ export function getPlatformFromId(id: string): string {
   if (id.startsWith("bb_") || id.startsWith("bb-")) return "bigbasket"
   if (id.startsWith("blinkit_")) return "blinkit"
   if (id.startsWith("swiggy_")) return "swiggy"
+  if (id.startsWith("fm_")) return "flipkart_minutes"
   if (/^\d+$/.test(id)) return "swiggy"
   return "zepto"
 }

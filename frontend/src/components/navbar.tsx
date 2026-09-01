@@ -52,8 +52,9 @@ function RadarLogo({ size = 22 }: { size?: number }) {
 const PLATFORM_DOTS = [
   { label: "Zepto", color: "#7B2FF7" },
   { label: "Instamart", color: "#F97316" },
-  { label: "BigBasket", color: "#65A30D" },
-  { label: "Blinkit", color: "#E8B007" },
+  { label: "BigBasket", color: "#84CC16" },
+  { label: "Blinkit", color: "#FACC15" },
+  { label: "Flipkart Minutes", color: "#008CFF" },
 ];
 
 interface NavbarProps {
