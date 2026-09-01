@@ -540,9 +540,18 @@ export function App() {
   )
   const cheapestId = useMemo(() => {
     let best: { id: string; price: number } | null = null
+    
+    // Check if we can safely compare unit prices (all have same unit)
+    const units = new Set(inStock.map(r => r.product?.total_quantity_unit).filter(Boolean))
+    const canCompareUnitPrices = units.size === 1
+    
     for (const r of inStock) {
-      if (r.price != null && (best === null || r.price < best.price)) {
-        best = { id: r.store.id, price: r.price }
+      const comparePrice = (canCompareUnitPrices && r.product?.price_per_unit != null) 
+        ? r.product.price_per_unit 
+        : r.price;
+        
+      if (comparePrice != null && (best === null || comparePrice < best.price)) {
+        best = { id: r.store.id, price: comparePrice }
       }
     }
     return inStock.length > 1 ? (best?.id ?? null) : null

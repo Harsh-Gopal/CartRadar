@@ -70,6 +70,7 @@ async def run_search(
                 "status": status,
                 "price": result.price if result else None,
                 "mrp": result.mrp if result else None,
+                "product": asdict(result) if result else None,
             }
         )
 
