@@ -1,0 +1,14 @@
+[Desktop Entry]
+Version=1.1
+Type=Application
+Name=Cart Radar
+GenericName=Grocery Stock Checker
+Comment=Check product availability across Indian quick-commerce platforms
+# Exec uses the absolute path to the launcher script placed alongside this .desktop file.
+# %k expands to the path of this .desktop file itself, so dirname gives the project folder.
+Exec=bash -c 'cd "$(dirname "%k")" && bash "Cart Radar.sh"'
+Icon=utilities-terminal
+Terminal=true
+Categories=Network;Utility;
+Keywords=grocery;stock;zepto;swiggy;blinkit;bigbasket;
+StartupNotify=true

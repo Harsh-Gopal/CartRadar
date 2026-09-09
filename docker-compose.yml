@@ -1,0 +1,57 @@
+# Cart Radar — Docker Compose for one-click local launch
+# Usage:
+#   docker compose up          (run)
+#   docker compose up --build  (rebuild images after code changes)
+#   docker compose down        (stop and remove containers)
+#
+# Developers: continue using ./dev.sh for hot-reload development.
+# This file is intended for non-technical users who just want to run the app.
+
+services:
+
+  # ── Backend (FastAPI + uvicorn) ──────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      # DEV_MODE=true: removes the auth-token requirement so the app works
+      # out of the box without any configuration.
+      - DEV_MODE=true
+      # Enable all stable platforms by default.
+      - ENABLED_PLATFORMS=zepto,swiggy,bigbasket,blinkit,bbnow
+      # PROXY_URL: optional — read from .env file if present (see below).
+      - PROXY_URL=${PROXY_URL:-}
+      # DB_PATH: persist the store-discovery cache across container restarts.
+      - DB_PATH=/data/stores.sqlite3
+    volumes:
+      # Named volume so the SQLite cache survives container restarts.
+      - cart-radar-data:/data
+    # Healthcheck: backend is ready when /api/ping returns 200.
+    healthcheck:
+      test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/api/ping')\" 2>/dev/null || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 60s
+    # Only expose internally — frontend nginx proxies /api to here.
+    expose:
+      - "8000"
+
+  # ── Frontend (React → nginx) ─────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      # Accessible at http://localhost:3000 on the host.
+      - "3000:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  # Persistent SQLite store-discovery cache.
+  cart-radar-data:

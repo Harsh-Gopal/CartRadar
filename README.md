@@ -147,6 +147,88 @@ pnpm dev
 
 ---
 
+## 🚀 Run Cart Radar Without Coding
+
+> No Python, no Node.js, no terminal knowledge needed — just Docker Desktop.
+
+### Step 1 — Install Docker Desktop (once)
+
+Download and install **[Docker Desktop](https://www.docker.com/products/docker-desktop/)** (free, available for macOS, Windows, and Linux).
+
+After installing, open Docker Desktop and wait until it shows **"Docker Desktop is running"** in the menu bar / taskbar.
+
+### Step 2 — Download Cart Radar
+
+```
+https://github.com/Harsh-Gopal/CartRadar
+```
+
+Click the green **"Code"** button → **"Download ZIP"**, then unzip it anywhere you like.
+
+### Step 3 — Double-click the launcher for your OS
+
+| OS | File to double-click |
+|---|---|
+| **macOS** | `Cart Radar.command` |
+| **Windows** | `Cart Radar.bat` |
+| **Linux** | `Cart Radar.sh` (or use `Cart Radar.desktop`) |
+
+> **macOS note:** The first time you open `Cart Radar.command`, macOS may show a security warning.  
+> Right-click (or Control+click) the file → **Open** → **Open** to allow it.
+
+The launcher will:
+1. Check that Docker Desktop is installed and running (and tell you clearly if it isn't).
+2. Download and build the Cart Radar images automatically.
+3. Wait until the app is fully ready.
+4. Open **[http://localhost:3000](http://localhost:3000)** in your browser.
+
+> **First launch:** Downloading and building the Docker images takes **3–5 minutes** depending on your internet speed. Subsequent launches take only a few seconds.
+
+### How to stop Cart Radar
+
+- **Close the launcher window** (macOS/Linux) — it will stop all services automatically.
+- **Windows:** Press any key in the batch window, or open a terminal in the project folder and run `docker compose down`.
+
+### Troubleshooting
+
+| Problem | Fix |
+|---|---|
+| "Docker is not installed" | Download Docker Desktop from the link shown in the launcher |
+| "Docker is not running" | Open Docker Desktop from your Applications / Start menu and wait for it to fully start |
+| Browser opens but shows an error | Wait 30 more seconds and refresh — the backend may still be starting |
+| Port 3000 is already in use | Stop whatever is using port 3000, or edit `docker-compose.yml` and change `"3000:80"` to e.g. `"3001:80"` |
+| Something else is broken | Run `docker compose logs` in the project folder and check the output |
+
+---
+
+## 🤖 Ask an AI to Help You Run Cart Radar
+
+If you get stuck, paste the following prompt into **ChatGPT**, **Claude**, **Gemini**, or any AI assistant:
+
+---
+
+```
+I want to run the Cart Radar app from this GitHub repository:
+https://github.com/Harsh-Gopal/CartRadar
+
+The app is in the `cart-radar/` subfolder of the repo.
+
+Please:
+1. Ask me what operating system I'm using (macOS / Windows / Linux).
+2. Check whether I have Docker Desktop installed and guide me through installing it if I don't.
+3. Guide me step by step through downloading the repo (as a ZIP if I'm not a developer) and running the correct launcher file:
+   - macOS → double-click "Cart Radar.command"
+   - Windows → double-click "Cart Radar.bat"
+   - Linux → run "Cart Radar.sh"
+4. Tell me what URL to open once it's running (http://localhost:3000).
+5. Help me troubleshoot any Docker or startup errors by reading the error messages I paste to you.
+6. Do not ask me to manually edit code or config files unless absolutely necessary.
+```
+
+---
+
+---
+
 ## 📱 How to Use
 
 1. **Paste a product link** — Copy any product URL from Zepto, Swiggy, BigBasket, Blinkit, or BB Now and paste it in the link box. The app auto-detects the platform instantly.
