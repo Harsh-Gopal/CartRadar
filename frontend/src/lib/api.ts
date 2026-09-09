@@ -1,11 +1,20 @@
 export interface ProductInfo {
-  status: "in_stock" | "out_of_stock" | "not_carried" | "error"
+  status: "in_stock" | "out_of_stock" | "not_carried" | "error" | "unknown"
   name: string | null
   brand: string | null
   image_url: string | null
   price: number | null
   mrp: number | null
   available_quantity: number | null
+  // Normalized quantity and pack fields
+  pack_count?: number | null
+  quantity_per_pack?: number | null
+  quantity_unit?: string | null
+  total_quantity?: number | null
+  total_quantity_unit?: string | null
+  price_per_unit?: number | null
+  raw_variant?: string | null
+  quantity_confidence?: string | null
 }
 
 export interface ResolveResponse {
@@ -52,6 +61,8 @@ export interface StoreResult {
   price: number | null
   mrp: number | null
   platform?: string
+  verified?: boolean
+  product?: ProductInfo | null
 }
 
 export interface SearchSummary {
@@ -75,13 +86,14 @@ export interface PlatformInfo {
   supports_geocoding: boolean
 }
 
-export interface DeliveryStatus {
-  is_open: boolean | null
-  always_open: boolean
-  opens_at: string | null    // "HH:MM" IST or null for 24x7
-  closes_at: string | null   // "HH:MM" IST or null for 24x7
-  notes: string
-  label: string
+/** Real-time serviceability response from /api/serviceability */
+export interface PlatformServiceability {
+  source: "live" | "timeout" | "error" | "skipped"
+  is_open: boolean | null     // true = platform delivering there right now
+  serviceable?: boolean
+  store_name?: string | null
+  city?: string | null
+  eta_minutes?: number | null
 }
 
 // -- access token ----------------------------------------------------------
@@ -120,9 +132,11 @@ export function getConfig() {
   return request<AppConfig>("/api/config")
 }
 
-export function getDeliveryHours(city?: string) {
-  const q = city ? `?city=${encodeURIComponent(city)}` : ""
-  return request<Record<string, DeliveryStatus>>(`/api/delivery-hours${q}`)
+/** Check real-time delivery availability at coordinates for all platforms. */
+export function getServiceability(lat: number, lng: number) {
+  return request<Record<string, PlatformServiceability>>(
+    `/api/serviceability?lat=${lat}&lng=${lng}`
+  )
 }
 
 /** Fire-and-forget: wake up Render from sleep before user performs a search. */
@@ -203,6 +217,8 @@ export const PLATFORM_COLORS: Record<string, string> = {
   bigbasket: "#84C225",    // BigBasket green
   blinkit: "#F5C913",      // Blinkit yellow
   bbnow: "#C4162A",        // Tata Neu / BB Now red
+  flipkart: "#2874F0",     // Flipkart blue
+  flipkart_minutes: "#2874F0",
 }
 
 export const PLATFORM_LABELS: Record<string, string> = {
@@ -211,6 +227,8 @@ export const PLATFORM_LABELS: Record<string, string> = {
   bigbasket: "BigBasket",
   blinkit: "Blinkit",
   bbnow: "BB Now",
+  flipkart: "Flipkart",
+  flipkart_minutes: "Flipkart Minutes",
 }
 
 export function detectPlatformFromUrl(url: string): string | null {
@@ -221,6 +239,20 @@ export function detectPlatformFromUrl(url: string): string | null {
   if (lower.includes("bbnow.bigbasket.com")) return "bbnow"
   if (lower.includes("bigbasket.com") || lower.includes("bb.com")) return "bigbasket"
   if (lower.includes("blinkit.com") || lower.includes("grofers.com")) return "blinkit"
+  
+  if (lower.includes("flipkart.com")) {
+    try {
+      const parsedUrl = new URL(url)
+      const marketplace = parsedUrl.searchParams.get("marketplace")
+      if (marketplace && marketplace.toUpperCase() === "HYPERLOCAL") {
+        return "flipkart_minutes"
+      }
+      return "flipkart"
+    } catch {
+      return "flipkart"
+    }
+  }
+
   // Zepto pvid pattern
   if (/\/pvid\/[0-9a-f-]{36}/i.test(lower)) return "zepto"
   return null

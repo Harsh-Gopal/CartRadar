@@ -28,9 +28,11 @@ from .platforms.swiggy import SwiggyClient
 from .platforms.bigbasket import BigBasketClient
 from .platforms.blinkit import BlinkitClient
 from .platforms.bbnow import BBNowClient
+from .platforms.flipkart import FlipkartClient, FlipkartMinutesClient
 from .ratelimit import ConcurrencyGate, RateLimiter, TokenBucket
 from .search import run_search
 from .store_cache import StoreCache
+from .geocoder import NominatimProvider
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
 log = logging.getLogger("main")
@@ -45,10 +47,18 @@ def _create_clients() -> dict[str, PlatformClient]:
         clients["swiggy"] = SwiggyClient(config.PROXY_URL, config.SWIGGY_CONCURRENCY)
     if "bigbasket" in config.ENABLED_PLATFORMS:
         clients["bigbasket"] = BigBasketClient(config.PROXY_URL, config.BB_CONCURRENCY)
-    if "blinkit" in config.ENABLED_PLATFORMS:
-        clients["blinkit"] = BlinkitClient(config.PROXY_URL, 5) # Default 5 concurrency
+    if "blinkit" in config.ENABLED_PLATFORMS and config.PLAYWRIGHT_ENABLED:
+        # Blinkit requires Playwright (Chromium). On Render free tier (512MB RAM),
+        # Chromium alone uses ~250MB which causes OOM. Disable via PLAYWRIGHT_ENABLED=false.
+        clients["blinkit"] = BlinkitClient(config.PROXY_URL, 5)
+    elif "blinkit" in config.ENABLED_PLATFORMS:
+        log.warning("Blinkit is in ENABLED_PLATFORMS but PLAYWRIGHT_ENABLED=false — skipping Blinkit")
     if "bbnow" in config.ENABLED_PLATFORMS:
         clients["bbnow"] = BBNowClient(config.PROXY_URL, 4)
+    if "flipkart" in config.ENABLED_PLATFORMS:
+        clients["flipkart"] = FlipkartClient()
+    if "flipkart_minutes" in config.ENABLED_PLATFORMS:
+        clients["flipkart_minutes"] = FlipkartMinutesClient()
     log.info("enabled platforms: %s", list(clients.keys()))
     return clients
 
@@ -57,6 +67,7 @@ def _create_clients() -> dict[str, PlatformClient]:
 async def lifespan(app: FastAPI):
     app.state.clients = _create_clients()
     app.state.cache = StoreCache(config.DATABASE_PATH)
+    app.state.geocoder = NominatimProvider()
     app.state.limiter = RateLimiter(
         request_capacity=config.REQUEST_BURST,
         request_refill_per_sec=config.REQUESTS_PER_MIN / 60,
@@ -70,20 +81,21 @@ async def lifespan(app: FastAPI):
     app.state.probe_budget = TokenBucket(
         config.PROBE_BURST, config.PROBES_PER_DAY / 86_400
     )
-    # Pre-warm Playwright browser in background so the first Blinkit search isn't slow.
-    if "blinkit" in config.ENABLED_PLATFORMS:
-        from .platforms.blinkit import prewarm_browser
-        asyncio.create_task(prewarm_browser())
+    # NOTE: Do NOT pre-warm Playwright here — Chromium uses ~250MB which causes
+    # OOM on Render free tier (512MB total). Blinkit browser launches lazily on first use.
     yield
     for client in app.state.clients.values():
         await client.aclose()
-    # Close shared Playwright browser (Blinkit)
-    try:
-        from .platforms.blinkit import _close_browser as blinkit_close
-        await blinkit_close()
-    except Exception:
-        pass
+    # Close shared Playwright browser (Blinkit) if it was started
+    if config.PLAYWRIGHT_ENABLED:
+        try:
+            from .platforms.blinkit import _close_browser as blinkit_close
+            await blinkit_close()
+        except Exception:
+            pass
     app.state.cache.close()
+    if hasattr(app.state, "geocoder") and hasattr(app.state.geocoder, "close"):
+        await app.state.geocoder.close()
 
 
 
@@ -171,17 +183,47 @@ async def ping():
     return {"ok": True}
 
 
-@app.get("/api/delivery-hours")
-async def delivery_hours(city: str | None = Query(default=None)):
-    """Return current delivery status for all enabled platforms.
 
-    Pass ?city=<city name> to get accurate 24×7 status for metro areas.
-    Response is not rate-limited (pure local computation, no external calls).
+@app.get("/api/serviceability", dependencies=[Depends(require_access)])
+async def check_serviceability(
+    lat: float = Query(...),
+    lng: float = Query(...),
+    request: Request = None,
+):
+    """Real-time delivery availability check at the given coordinates.
+
+    Calls each enabled platform's store-resolution API and returns live
+    serviceability — including city, ETA and whether delivery is active right now.
+    Blinkit is excluded (Playwright/browser-based, too slow for a quick check).
+    Timeout per platform: 8 s.
     """
-    from .delivery_hours import get_all_delivery_status
-    all_status = get_all_delivery_status(city)
-    # Only return status for enabled platforms
-    return {p: s for p, s in all_status.items() if p in config.ENABLED_PLATFORMS}
+    clients: dict[str, PlatformClient] = request.app.state.clients
+    results: dict = {}
+
+    async def _check(name: str, client: PlatformClient) -> None:
+        # Skip Playwright-based platforms — their resolve_store is too slow/heavy
+        # for a quick availability pre-check.
+        if name in ("blinkit", "flipkart", "flipkart_minutes", "zepto"):
+            results[name] = {"source": "skipped", "is_open": None}
+            return
+        try:
+            res = await asyncio.wait_for(client.resolve_store(lat, lng), timeout=8.0)
+            results[name] = {
+                "source": "live",
+                "is_open": res.serviceable,
+                "serviceable": res.serviceable,
+                "store_name": res.store_name,
+                "city": res.city,
+                "eta_minutes": res.eta_minutes,
+            }
+        except asyncio.TimeoutError:
+            results[name] = {"source": "timeout", "is_open": None}
+        except PlatformError as exc:
+            log.warning("serviceability check failed for %s: %s", name, exc)
+            results[name] = {"source": "error", "is_open": None}
+
+    await asyncio.gather(*[_check(n, c) for n, c in clients.items()])
+    return results
 
 
 @app.get("/api/config")
@@ -223,16 +265,25 @@ async def resolve_link(body: ResolveRequest, request: Request):
     # Fetch a product card for display
     try:
         if platform_name == "zepto":
-            # Zepto needs a store context to fetch product details
-            store_id = SAMPLE_STORE_ID
-            if body.lat is not None and body.lng is not None:
-                try:
-                    home = await client.resolve_store(body.lat, body.lng)
-                    if home.serviceable and home.store_id:
-                        store_id = home.store_id
-                except PlatformError:
-                    pass
-            product = await client.product_at_store(product_id, store_id)
+            # Zepto uses Playwright to organically fetch metadata & handle WAF
+            lat = body.lat if body.lat is not None else 28.6139
+            lng = body.lng if body.lng is not None else 77.2090
+            try:
+                res = await client.fetch_availability_playwright(lat, lng, product_id)
+                product = res.get("product")
+                if not product and res.get("error_reason"):
+                    # If we hit a WAF/Playwright error, return a fallback so the UI doesn't 500
+                    from .platforms.base import ProductResult
+                    product = ProductResult(status="error", name="Zepto Product", image_url="")
+            except Exception as e:
+                log.warning("Zepto metadata fetch via Playwright failed: %s", e)
+                from .platforms.base import ProductResult
+                product = ProductResult(status="error", name="Zepto Product", image_url="")
+        elif platform_name == "flipkart_minutes":
+            # Delegate metadata extraction to the robust normal Flipkart client (uses ld+json API)
+            # Flipkart Minutes and standard Flipkart share the same catalog metadata
+            fk_client = get_client("flipkart", request)
+            product = await fk_client.product_at_location(product_id, body.lat or 28.6139, body.lng or 77.2090)
         else:
             # Other platforms: try product_at_location if coords are available
             if body.lat is not None and body.lng is not None:
@@ -426,6 +477,32 @@ async def list_platforms(request: Request):
 @app.get("/api/stats", dependencies=[Depends(require_access)])
 async def stats(request: Request):
     return request.app.state.cache.stats()
+
+
+@app.get("/api/geocode", dependencies=[Depends(require_access)])
+async def geocode(request: Request, lat: float, lng: float):
+    if lat < -90 or lat > 90 or lng < -180 or lng > 180:
+        raise HTTPException(400, "Invalid coordinates")
+    if lat == 0 and lng == 0:
+        raise HTTPException(400, "Suspicious coordinates (0,0)")
+        
+    cache = request.app.state.cache
+    # Round to 4 decimal places for deduplication (approx 11m precision)
+    r_lat = round(lat, 4)
+    r_lng = round(lng, 4)
+    
+    cached = cache.get_address(r_lat, r_lng)
+    if cached:
+        return cached.dict()
+        
+    geocoder = request.app.state.geocoder
+    result = await geocoder.reverse_geocode(lat, lng)
+    
+    if result:
+        cache.save_address(r_lat, r_lng, result)
+        return result.dict()
+        
+    raise HTTPException(503, "Failed to resolve address")
 
 
 if config.STATIC_DIR.is_dir():

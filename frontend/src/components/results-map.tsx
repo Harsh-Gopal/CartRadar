@@ -1,7 +1,7 @@
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 
 import L from "leaflet"
-import { Circle, CircleMarker, MapContainer, Popup, Tooltip, TileLayer, useMap } from "react-leaflet"
+import { Circle, CircleMarker, Marker, MapContainer, Popup, Tooltip, TileLayer, useMap } from "react-leaflet"
 import "leaflet/dist/leaflet.css"
 
 import { cn } from "@/lib/utils"
@@ -35,11 +35,23 @@ function getColor(status: StoreResult["status"], platform?: string): string {
   return ERROR_COLOR
 }
 
-function FitToRadius({ lat, lng, radiusKm }: { lat: number; lng: number; radiusKm: number }) {
+function FitToRadius({ lat, lng, radiusKm, fitKey }: { lat: number; lng: number; radiusKm: number; fitKey?: number }) {
   const map = useMap()
   useEffect(() => {
     map.fitBounds(L.latLng(lat, lng).toBounds(radiusKm * 2000))
-  }, [map, lat, lng, radiusKm])
+  }, [map, lat, lng, radiusKm, fitKey])
+  return null
+}
+
+function MapResizer() {
+  const map = useMap()
+  useEffect(() => {
+    const observer = new ResizeObserver(() => {
+      map.invalidateSize()
+    })
+    observer.observe(map.getContainer())
+    return () => observer.disconnect()
+  }, [map])
   return null
 }
 
@@ -53,6 +65,18 @@ function FlyToSelected({ results, selectedId }: { results: StoreResult[]; select
   }, [map, results, selectedId])
   return null
 }
+
+const userIconSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512" width="28" height="38" style="filter: drop-shadow(0px 2px 3px rgba(0,0,0,0.4));">
+  <path fill="#6d28d9" d="M215.7 499.2C267 435 384 279.4 384 192C384 86 298 0 192 0S0 86 0 192c0 87.4 117 243 168.3 307.2c12.3 15.3 35.1 15.3 47.4 0zM192 128a64 64 0 1 1 0 128 64 64 0 1 1 0-128z"/>
+</svg>`;
+
+const createUserIcon = () => new L.DivIcon({
+  html: userIconSvg,
+  className: '', // remove default Leaflet styles
+  iconSize: [28, 38],
+  iconAnchor: [14, 38],
+  popupAnchor: [0, -38],
+});
 
 function StoreMarker({ r, selectedId, searchPincode, onSelect }: { r: StoreResult; selectedId: string | null; searchPincode?: string | null; onSelect: (r: StoreResult) => void }) {
   const storePincode = usePincode(r.store.lat, r.store.lng, r.store.city)
@@ -108,39 +132,83 @@ interface ResultsMapProps {
 export function ResultsMap({ lat, lng, radiusKm, results, homeStatus, homePrice, selectedId, searchPincode, onSelect, className }: ResultsMapProps) {
   const { resolvedTheme } = useTheme()
   const isDark = (resolvedTheme ?? "dark") === "dark"
+  const [fitKey, setFitKey] = useState(0)
+  const [userIcon] = useState(() => createUserIcon())
+
+  const [mapMode, setMapMode] = useState<"simple" | "detailed">(() => {
+    try {
+      return (localStorage.getItem("mf.mapMode") as "simple" | "detailed") || "simple"
+    } catch {
+      return "simple"
+    }
+  })
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("mf.mapMode", mapMode)
+    } catch {
+      // ignore
+    }
+  }, [mapMode])
+
+  const mapFilter = mapMode === "simple"
+    ? isDark
+      ? ".leaflet-tile-pane { filter: invert(100%) hue-rotate(180deg) grayscale(100%) opacity(25%) contrast(120%) brightness(130%); }"
+      : ".leaflet-tile-pane { filter: grayscale(100%) opacity(30%) contrast(110%) brightness(110%); }"
+    : isDark
+      ? ".leaflet-tile-pane { filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%); }"
+      : ""
+
   return (
-    <MapContainer
-      center={[lat, lng]}
-      zoom={12}
-      className={cn("z-0 w-full", className || "h-72")}
-      scrollWheelZoom={false}
-    >
-      {/* Apply CSS filter on tile pane for dark mode — no API key needed */}
-      <style>{isDark ? ".leaflet-tile-pane { filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%); }" : ""}</style>
-      <TileLayer
+    <div className={cn("relative z-0 w-full", className || "h-72")}>
+      <style>{mapFilter}</style>
+      
+      <div className="absolute bottom-6 md:bottom-8 right-2 md:right-4 z-[1000]">
+        <button
+          onClick={(e) => { e.preventDefault(); e.stopPropagation(); setFitKey((k) => k + 1) }}
+          className="bg-background/95 backdrop-blur-sm border border-border rounded-lg shadow-md text-xs font-semibold px-3 py-2 hover:bg-muted text-foreground transition-all flex items-center gap-1.5"
+        >
+          View search area
+        </button>
+      </div>
+
+      <div className="absolute top-2 right-2 z-[1000] bg-background/90 backdrop-blur-sm border rounded-lg shadow-sm text-[10px] font-medium flex overflow-hidden">
+        <button
+          onClick={(e) => { e.preventDefault(); e.stopPropagation(); setMapMode("simple") }}
+          className={cn("px-2 py-1 transition-colors", mapMode === "simple" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")}
+        >
+          Simple
+        </button>
+        <button
+          onClick={(e) => { e.preventDefault(); e.stopPropagation(); setMapMode("detailed") }}
+          className={cn("px-2 py-1 transition-colors", mapMode === "detailed" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")}
+        >
+          Detailed
+        </button>
+      </div>
+      <MapContainer
+        center={[lat, lng]}
+        zoom={12}
+        className="w-full h-full"
+        scrollWheelZoom={true}
+        touchZoom={true}
+        doubleClickZoom={true}
+        dragging={true}
+      >
+        <TileLayer
         key={resolvedTheme}
         attribution={TILE_ATTRIBUTION}
         url={TILE_URL}
       />
-      <FitToRadius lat={lat} lng={lng} radiusKm={radiusKm} />
+      <MapResizer />
+      <FitToRadius lat={lat} lng={lng} radiusKm={radiusKm} fitKey={fitKey} />
       <FlyToSelected results={results} selectedId={selectedId} />
       <Circle
         center={[lat, lng]}
         radius={radiusKm * 1000}
         pathOptions={{ color: "#7c3aed", weight: 1, fillOpacity: 0.04 }}
       />
-      <CircleMarker
-        center={[lat, lng]}
-        radius={8}
-        pathOptions={{
-          // Purple ring keeps it identifiable as "you"; fill reflects stock at
-          // your location (green when in stock, incl. via the backup store).
-          color: "#6d28d9",
-          weight: 3,
-          fillColor: homeStatus ? getColor(homeStatus, "default") : "#1A73E8",
-          fillOpacity: 1,
-        }}
-      >
+      <Marker position={[lat, lng]} icon={userIcon}>
         <Popup>
           <span className="font-medium">Your location</span>
           {homeStatus && (
@@ -152,16 +220,24 @@ export function ResultsMap({ lat, lng, radiusKm, results, homeStatus, homePrice,
             </>
           )}
         </Popup>
-      </CircleMarker>
-      {results.map((r) => (
-        <StoreMarker
-          key={r.store.id}
-          r={r}
-          selectedId={selectedId}
-          searchPincode={searchPincode}
-          onSelect={onSelect}
-        />
-      ))}
+      </Marker>
+      {results.map((r) => {
+        // Hide store marker if it perfectly overlaps the user's exact coordinate
+        // (This typically happens for virtual stores before they are clustered away from the center)
+        if (r.store.lat === lat && r.store.lng === lng) {
+          return null;
+        }
+        return (
+          <StoreMarker
+            key={r.store.id}
+            r={r}
+            selectedId={selectedId}
+            searchPincode={searchPincode}
+            onSelect={onSelect}
+          />
+        );
+      })}
     </MapContainer>
+    </div>
   )
 }

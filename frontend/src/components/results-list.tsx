@@ -21,6 +21,7 @@ export const STATUS_LABEL: Record<StoreResult["status"], string> = {
   out_of_stock: "Out of stock",
   not_carried: "Limited Distribution",
   error: "Unavailable",
+  unknown: "Unable to verify",
 }
 
 export const STATUS_VARIANT: Record<
@@ -31,6 +32,7 @@ export const STATUS_VARIANT: Record<
   out_of_stock: "secondary",
   not_carried: "outline",
   error: "outline",  // Changed from destructive to outline (less alarming)
+  unknown: "outline",
 }
 
 export function prettyStoreName(name: string | null): string {
@@ -54,6 +56,7 @@ export function getPlatformFromResult(r: StoreResult): string {
   if (id.startsWith("bb_") || id.startsWith("bb-")) return "bigbasket"
   if (id.startsWith("blinkit_")) return "blinkit"
   if (id.startsWith("swiggy_")) return "swiggy"
+  if (id.startsWith("fm_")) return "flipkart_minutes"
   if (/^\d+$/.test(id)) return "swiggy"
   return "zepto"
 }
@@ -63,6 +66,7 @@ export function getPlatformFromId(id: string): string {
   if (id.startsWith("bb_") || id.startsWith("bb-")) return "bigbasket"
   if (id.startsWith("blinkit_")) return "blinkit"
   if (id.startsWith("swiggy_")) return "swiggy"
+  if (id.startsWith("fm_")) return "flipkart_minutes"
   if (/^\d+$/.test(id)) return "swiggy"
   return "zepto"
 }
@@ -135,9 +139,16 @@ function StoreListItem({
         </ItemContent>
         <ItemActions className="flex-col items-end gap-1 shrink-0">
           {r.status === "in_stock" && r.price != null ? (
-            <span className="text-sm font-semibold tabular-nums text-primary">
-              ₹{formatPrice(r.price)}
-            </span>
+            <div className="flex flex-col items-end">
+              <span className="text-sm font-semibold tabular-nums text-primary">
+                ₹{formatPrice(r.price)}
+              </span>
+              {r.product?.pack_count && r.product.pack_count > 1 && r.product.price_per_unit != null && (
+                <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                  (₹{formatPrice(r.product.price_per_unit)} / {r.product.quantity_unit})
+                </span>
+              )}
+            </div>
           ) : (
             <span className="text-sm font-medium opacity-0">₹0</span>
           )}
@@ -152,6 +163,10 @@ function StoreListItem({
           ) : r.status === "not_carried" ? (
             <Badge variant="outline" className="h-5 text-[10px] text-muted-foreground">
               Limited
+            </Badge>
+          ) : r.status === "unknown" ? (
+            <Badge variant="secondary" className="h-5 text-[10px] text-slate-600 bg-slate-100 border-slate-200">
+              Unable to verify
             </Badge>
           ) : (
             // error status — show as muted "Unavailable" not alarming red

@@ -13,6 +13,7 @@ import time
 from typing import Any
 
 from .base import PlatformClient, PlatformError, ProductResult, StoreResolution
+from ..normalization import parse_quantity
 
 log = logging.getLogger("blinkit")
 
@@ -87,23 +88,27 @@ def _parse_snippets(snippets: list[dict], product_id: str) -> ProductResult:
     price: float | None = None
     mrp: float | None = None
     image_url: str | None = None
+    raw_quantity: str | None = None
     is_in_stock: bool = False
     found_product = False
 
     for snippet in snippets:
         data = snippet.get("data", {})
-        if not isinstance(data, dict):
+        if not data:
             continue
+
+        widget = data.get("widget")
+        if widget in ("product_pdp_inventory", "inventory", "inventory_v2"):
+            inventory = data.get("inventory")
+            try:
+                is_in_stock = int(inventory) > 0
+            except (TypeError, ValueError):
+                is_in_stock = bool(inventory)
 
         # Primary: snippet with identity.id matching product_id
         identity = data.get("identity", {})
         if isinstance(identity, dict) and str(identity.get("id")) == product_id:
             found_product = True
-            inventory = data.get("inventory", 0)
-            try:
-                is_in_stock = int(inventory) > 0
-            except (TypeError, ValueError):
-                is_in_stock = bool(inventory)
 
             # Try rfc_actions_v2 → remove_from_cart for product details
             rfc = data.get("rfc_actions_v2", {})
@@ -117,6 +122,7 @@ def _parse_snippets(snippets: list[dict], product_id: str) -> ProductResult:
                             image_url = cart_item.get("image_url")
                             mrp = cart_item.get("mrp") or None
                             price = cart_item.get("price") or mrp
+                            raw_quantity = cart_item.get("unit") or cart_item.get("quantity")
                             break
 
             # Try atc_actions_v2 → add_to_cart if rfc didn't give price
@@ -133,6 +139,8 @@ def _parse_snippets(snippets: list[dict], product_id: str) -> ProductResult:
                                     brand = cart_item.get("brand")
                                 if not image_url:
                                     image_url = cart_item.get("image_url")
+                                if not raw_quantity:
+                                    raw_quantity = cart_item.get("unit") or cart_item.get("quantity")
                                 mrp = cart_item.get("mrp") or None
                                 price = cart_item.get("price") or mrp
                                 break
@@ -144,6 +152,7 @@ def _parse_snippets(snippets: list[dict], product_id: str) -> ProductResult:
                     name = prod_data.get("name") or prod_data.get("product_name")
                     brand = prod_data.get("brand")
                     image_url = prod_data.get("image_url")
+                    raw_quantity = raw_quantity or prod_data.get("unit") or prod_data.get("quantity")
 
         # Look for image in item lists even without id match
         if not image_url:
@@ -162,6 +171,10 @@ def _parse_snippets(snippets: list[dict], product_id: str) -> ProductResult:
         status = "in_stock" if is_in_stock else "out_of_stock"
         actual_price = float(price) if price and float(price) > 0 else None
         actual_mrp = float(mrp) if mrp and float(mrp) > 0 else actual_price
+        
+        variant_label = raw_quantity if raw_quantity else (name or "")
+        nq = parse_quantity(variant_label)
+        
         return ProductResult(
             status=status,
             name=name,
@@ -169,6 +182,14 @@ def _parse_snippets(snippets: list[dict], product_id: str) -> ProductResult:
             image_url=image_url,
             price=actual_price,
             mrp=actual_mrp,
+            pack_count=nq.pack_count if nq else None,
+            quantity_per_pack=nq.quantity_per_pack if nq else None,
+            quantity_unit=nq.quantity_unit if nq else None,
+            total_quantity=nq.total_quantity if nq else None,
+            total_quantity_unit=nq.total_quantity_unit if nq else None,
+            price_per_unit=(actual_price) / nq.total_quantity if (actual_price and nq and nq.total_quantity > 0) else None,
+            raw_variant=variant_label,
+            quantity_confidence=nq.confidence if nq else None
         )
 
     return ProductResult(status="not_carried")

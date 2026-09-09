@@ -18,6 +18,12 @@ DEV_MODE = _flag("DEV_MODE", False)
 APP_TOKEN = os.environ.get("APP_TOKEN") or None
 TRUST_FORWARDED_FOR = _flag("TRUST_FORWARDED_FOR", True)
 
+# -- playwright (Blinkit) --------------------------------------------------
+# Disable on memory-constrained deployments (Render free tier = 512MB).
+# Chromium alone uses ~250MB; combined with the app it causes OOM.
+# Set PLAYWRIGHT_ENABLED=false in Render env vars to skip Blinkit entirely.
+PLAYWRIGHT_ENABLED = _flag("PLAYWRIGHT_ENABLED", True)
+
 REQUEST_BURST = int(os.environ.get("REQUEST_BURST", "30"))
 REQUESTS_PER_MIN = int(os.environ.get("REQUESTS_PER_MIN", "60"))
 SEARCH_BURST = int(os.environ.get("SEARCH_BURST", "1000"))
@@ -39,6 +45,6 @@ UNSERVICEABLE_PROBE_TTL_DAYS = 30
 # others are implemented. Set to "zepto,swiggy,bigbasket,blinkit" to enable all.
 ENABLED_PLATFORMS = [
     p.strip()
-    for p in os.environ.get("ENABLED_PLATFORMS", "zepto,swiggy,bigbasket,blinkit,bbnow").split(",")
+    for p in os.environ.get("ENABLED_PLATFORMS", "zepto,swiggy,bigbasket,blinkit,bbnow,flipkart,flipkart_minutes").split(",")
     if p.strip()
 ]

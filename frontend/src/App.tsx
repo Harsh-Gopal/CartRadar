@@ -97,11 +97,12 @@ import {
 } from "@/components/results-list"
 import { ResultsMap } from "@/components/results-map"
  import { DeliveryBadge, DeliveryWarningBanner } from "@/components/delivery-badge"
-import { useAddressDetails } from "@/lib/use-address"
+import { useGeocode } from "@/hooks/use-geocode"
 import { useSearch } from "@/hooks/use-search"
 import {
   detectPlatformFromUrl,
   getConfig,
+  getServiceability,
   getToken,
   pingBackend,
   PLATFORM_LABELS,
@@ -109,6 +110,7 @@ import {
   setToken,
   type AppConfig,
   type GeocodeResponse,
+  type PlatformServiceability,
   type ResolveResponse,
   type StoreResult,
 } from "@/lib/api"
@@ -181,47 +183,99 @@ function looksResolvable(text: string): boolean {
 const RADIUS_PRESETS = [5, 10, 20, 30]
 
 function AddressSection({ lat, lng }: { lat: number; lng: number }) {
-  const { details, loading } = useAddressDetails(lat, lng)
+  const { result, state } = useGeocode(lat, lng)
 
-  if (loading) {
-    return <div className="text-xs text-muted-foreground animate-pulse mt-2 p-3 bg-muted/30 rounded-lg border">Finding precise address...</div>
+  if (state === "LOADING") {
+    return <div className="text-[11px] text-muted-foreground animate-pulse mt-2 p-3 bg-muted/30 rounded-lg border flex items-center gap-2">
+      <HugeiconsIcon icon={MapPinIcon} className="w-3.5 h-3.5" />
+      Resolving precise location...
+    </div>
   }
 
-  if (!details) return null
+  if (state === "FAILED" || state === "INVALID_COORDINATES") {
+    return (
+      <div className="mt-2 space-y-2 bg-muted/30 rounded-lg p-3 border">
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex items-center gap-2 text-destructive/80">
+            <HugeiconsIcon icon={CancelCircleIcon} className="w-4 h-4" />
+            <p className="text-xs font-semibold">Address unavailable</p>
+          </div>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="h-7 text-[10px]" 
+            onClick={() => window.open(`https://www.google.com/maps/search/?api=1&query=${lat},${lng}`, "_blank")}
+          >
+            <HugeiconsIcon icon={MapPinIcon} className="w-3 h-3 mr-1" />
+            Open in Maps
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
+  if (!result || state === "IDLE") return null
+
+  const isApproximate = result.confidence === "LOW" || result.confidence === "UNKNOWN"
 
   return (
     <div className="mt-2 space-y-2 bg-muted/30 rounded-lg p-3 border">
       <div className="flex items-start justify-between gap-2">
-        <div>
-          <p className="text-xs font-semibold text-foreground/80">Location Address</p>
-          <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2" title={details.address}>
-            {details.address}
+        <div className="flex-1">
+          <div className="flex items-center gap-1.5 mb-1">
+            <HugeiconsIcon icon={MapPinIcon} className="w-3.5 h-3.5 text-primary" />
+            <p className="text-xs font-semibold text-foreground/80">
+              {result.short_address}
+            </p>
+          </div>
+          <p className="text-[11px] text-muted-foreground leading-relaxed line-clamp-2" title={result.formatted_address}>
+            {result.formatted_address}
           </p>
+          {isApproximate && (
+            <p className="text-[10px] text-amber-600/90 font-medium mt-1.5 flex items-center gap-1">
+              <HugeiconsIcon icon={InformationCircleIcon} className="w-3 h-3" />
+              Approximate location based on warehouse coordinates
+            </p>
+          )}
         </div>
+        <div className="flex flex-col gap-1.5 shrink-0">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="h-6 w-6" 
+            onClick={() => {
+              navigator.clipboard.writeText(result.formatted_address)
+              toast.success("Address copied")
+            }}
+            title="Copy Address"
+          >
+            <HugeiconsIcon icon={Copy01Icon} className="w-3.5 h-3.5" />
+          </Button>
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="h-6 w-6" 
+            onClick={() => {
+              navigator.clipboard.writeText(`${lat}, ${lng}`)
+              toast.success("Coordinates copied")
+            }}
+            title="Copy Coordinates"
+          >
+            <HugeiconsIcon icon={LocationOffline01Icon} className="w-3.5 h-3.5" />
+          </Button>
+        </div>
+      </div>
+      <div className="pt-2 border-t border-border/50 mt-2">
         <Button 
-          variant="ghost" 
-          size="icon" 
-          className="h-6 w-6 shrink-0" 
-          onClick={() => {
-            navigator.clipboard.writeText(details.address)
-            toast.success("Address copied")
-          }}
-          title="Copy Address"
+          variant="secondary" 
+          size="sm" 
+          className="w-full text-[11px] h-7"
+          onClick={() => window.open(`https://www.google.com/maps/search/?api=1&query=${lat},${lng}`, "_blank")}
         >
-          <HugeiconsIcon icon={Copy01Icon} className="w-3.5 h-3.5" />
+          Open in Maps
+          <HugeiconsIcon icon={ArrowUpRight01Icon} className="w-3 h-3 ml-1" />
         </Button>
       </div>
-
-      {details.suggestions && details.suggestions.length > 0 && (
-        <div className="pt-1 border-t border-border/50 mt-2">
-          <p className="text-[11px] font-semibold text-foreground/80">Nearby Landmarks (for delivery reference)</p>
-          <ul className="text-[11px] text-muted-foreground list-disc pl-4 mt-1 space-y-0.5">
-            {details.suggestions.map((s: string, i: number) => (
-              <li key={i}>{s}</li>
-            ))}
-          </ul>
-        </div>
-      )}
     </div>
   )
 }
@@ -264,6 +318,24 @@ export function App() {
   const [detail, setDetail] = useState<StoreResult | null>(null)
   const [view, setView] = useState<"map" | "list">("map")
   const [lastRunKey, setLastRunKey] = useState<string | null>(null)
+
+  const [serviceability, setServiceability] = useState<Record<string, PlatformServiceability> | null>(null)
+
+  // Fetch real-time serviceability whenever coordinates change
+  useEffect(() => {
+    if (!coords) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setServiceability(null)
+      return
+    }
+    let active = true
+    getServiceability(coords.lat, coords.lng)
+      .then(res => {
+        if (active) setServiceability(res)
+      })
+      .catch(err => console.error("Failed to check serviceability", err))
+    return () => { active = false }
+  }, [coords])
 
   // -- watchlist helpers --
   function isInWatchlist(pvid: string) {
@@ -353,10 +425,13 @@ export function App() {
   async function doResolve(text: string) {
     setResolving(true)
     setResolveError(null)
+    const currentLoc = coords ? `${coords.lat},${coords.lng}` : ""
+    const cacheKey = `${text}|${currentLoc}`
+    
     try {
       const result = await resolveLink(text, coords)
       setResolved(result)
-      resolvedFor.current = text
+      resolvedFor.current = cacheKey
       setRecent((prev) => {
         const next: RecentProduct[] = [
           {
@@ -388,6 +463,7 @@ export function App() {
       })
     } catch (e) {
       setResolved(null)
+      resolvedFor.current = null
       setResolveError(
         e instanceof Error ? e.message : "Couldn't read that link."
       )
@@ -399,17 +475,20 @@ export function App() {
   // Auto-resolve as soon as the pasted text looks like a Zepto link.
   useEffect(() => {
     const text = linkText.trim()
+    const currentLoc = coords ? `${coords.lat},${coords.lng}` : ""
+    const currentKey = `${text}|${currentLoc}`
+    
     if (
       !text ||
       resolving ||
-      resolvedFor.current === text ||
+      resolvedFor.current === currentKey ||
       !looksResolvable(text)
     )
       return
     const timer = setTimeout(() => doResolve(text), 350)
     return () => clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [linkText, resolving])
+  }, [linkText, resolving, coords])
 
   const searchKey =
     resolved && coords
@@ -461,9 +540,18 @@ export function App() {
   )
   const cheapestId = useMemo(() => {
     let best: { id: string; price: number } | null = null
+    
+    // Check if we can safely compare unit prices (all have same unit)
+    const units = new Set(inStock.map(r => r.product?.total_quantity_unit).filter(Boolean))
+    const canCompareUnitPrices = units.size === 1
+    
     for (const r of inStock) {
-      if (r.price != null && (best === null || r.price < best.price)) {
-        best = { id: r.store.id, price: r.price }
+      const comparePrice = (canCompareUnitPrices && r.product?.price_per_unit != null) 
+        ? r.product.price_per_unit 
+        : r.price;
+        
+      if (comparePrice != null && (best === null || comparePrice < best.price)) {
+        best = { id: r.store.id, price: comparePrice }
       }
     }
     return inStock.length > 1 ? (best?.id ?? null) : null
@@ -626,7 +714,7 @@ export function App() {
                 </CardTitle>
                 {!resolved && (
                   <CardDescription>
-                    Paste a link from Zepto, Instamart, BigBasket, Blinkit, or BB Now
+                    Paste a link from Zepto, Instamart, BigBasket, Blinkit, or Flipkart Minutes
                     — it loads automatically.
                   </CardDescription>
                 )}
@@ -639,7 +727,7 @@ export function App() {
                     </InputGroupAddon>
                     <InputGroupInput
                       id="link"
-                      placeholder="Paste a product link from Zepto, Instamart, BigBasket, Blinkit, or BB Now…"
+                      placeholder="Paste a product link from Zepto, Instamart, BigBasket, Blinkit, or Flipkart Minutes…"
                       value={linkText}
                       aria-invalid={resolveError ? true : undefined}
                       onChange={(e) => setLinkText(e.target.value)}
@@ -801,7 +889,7 @@ export function App() {
                     <div className="flex items-center justify-between gap-2 animate-in fade-in-0 slide-in-from-bottom-1">
                       <div className="flex items-center gap-2 flex-wrap">
                         <PlatformBadge platform={platformName} size="md" />
-                        <DeliveryBadge platform={platformName} city={state.home?.city ?? null} />
+                        <DeliveryBadge platform={platformName} serviceability={serviceability?.[platformName]} loading={!serviceability} />
                       </div>
                       {resolved && (
                         <button
@@ -921,7 +1009,8 @@ export function App() {
             {resolved && (
               <DeliveryWarningBanner
                 platform={platformName}
-                city={state.home?.city ?? null}
+                platformLabel={PLATFORM_LABELS[platformName]}
+                serviceability={serviceability?.[platformName]}
               />
             )}
 
@@ -1010,6 +1099,8 @@ export function App() {
                           In stock at {inStock.length} of {sortedResults.length} stores
                           {searching && " — still checking…"}
                         </>
+                      ) : state.phase === "done" ? (
+                        "No stores found"
                       ) : (
                         statusText
                       )}
@@ -1075,6 +1166,11 @@ export function App() {
                     {!searching && sortedResults.length > 0 && visibleResults.length === 0 && (
                       <p className="px-4 py-3 text-sm text-muted-foreground bg-muted rounded-xl">
                         No stores match the filter.
+                      </p>
+                    )}
+                    {!searching && sortedResults.length === 0 && (
+                      <p className="px-4 py-3 text-sm text-muted-foreground bg-muted rounded-xl">
+                        No nearby stores carry this product.
                       </p>
                     )}
                   </div>
@@ -1215,7 +1311,7 @@ export function App() {
               <AccordionTrigger className="text-sm">How does Cart Radar work?</AccordionTrigger>
               <AccordionContent className="flex flex-col gap-2 text-sm text-muted-foreground">
                 <p>
-                  Paste a product link from Zepto, Instamart, BigBasket, Blinkit, or BB Now (Tata Neu). Cart Radar
+                  Paste a product link from Zepto, Instamart, BigBasket, Blinkit, or Flipkart Minutes. Cart Radar
                   auto-detects the platform, then sweeps nearby dark stores / warehouses
                   using a hex-grid scan and checks live stock at each one.
                 </p>
