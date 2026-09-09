@@ -130,6 +130,7 @@ Please help me set it up step by step.
 4. Check whether Docker Desktop is installed and running.
    If it is not installed, guide me to install Docker Desktop from:
    https://www.docker.com/products/docker-desktop/
+   (Note: Windows users may also need WSL 2 installed for Docker to run).
 
 5. Based on my operating system, tell me exactly which Cart Radar installation launcher to run:
    - macOS → Cart Radar Install.command
@@ -157,8 +158,8 @@ Always base your instructions on the current GitHub repository rather than older
 
 The easiest and recommended way to run Cart Radar is using the pre-built Docker images via our one-click launchers. You do NOT need Python, Node.js, or any other developer tools.
 
-1. Install **Docker Desktop** (free) from [docker.com](https://www.docker.com/products/docker-desktop/) and ensure it is running.
-2. Download or clone this repository and open the project folder.
+1. Install **Docker Desktop** (free) from [docker.com](https://www.docker.com/products/docker-desktop/) and ensure it is running. (Windows users: ensure WSL 2 is installed if required by Docker).
+2. Download this repository as a ZIP (Click the green "Code" button -> "Download ZIP") and extract it, or clone it if you have Git installed. Open the extracted project folder.
 3. Run the OS-specific installation launcher (this will check for Docker and download the latest images):
    - **macOS** → Double-click `Cart Radar Install.command`
    - **Windows** → Double-click `Cart Radar Install.bat`

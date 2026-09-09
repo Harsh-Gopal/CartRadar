@@ -24,7 +24,7 @@ The installation process checks if Docker is installed, guides you if it isn't, 
    * **Windows:** Double-click `Cart Radar Install.bat`
    * **Linux:** Double-click `Cart Radar Install.desktop` (or run `./Cart Radar Install.sh` in the terminal)
 4. Follow the on-screen prompts.
-   * If the script says **"Docker is not installed"**, it will provide a link to download Docker Desktop. Install it, open it, and wait for it to fully start before running the script again.
+   * If the script says **"Docker is not installed"**, it will provide a link to download Docker Desktop. Install it, open it, and wait for it to fully start before running the script again. (Windows users: You may be asked to install WSL 2 if it is missing).
 5. The script will download the pre-built Cart Radar images (~1-2 GB). This may take a few minutes depending on your internet connection.
 6. Once it says **"Installation Complete"**, you are ready to use Cart Radar.
 
@@ -91,6 +91,7 @@ docker compose up -d --remove-orphans
 | Problem | Solution |
 | :--- | :--- |
 | **Docker is not installed** | Download and install Docker Desktop from [docker.com](https://www.docker.com/products/docker-desktop/). |
+| **WSL 2 is missing (Windows)** | Open PowerShell as Administrator and run `wsl --install`, then restart your computer. |
 | **Docker is not running** | Open the Docker Desktop application from your Applications / Start menu. Wait for the icon in the menu bar/taskbar to stop animating and say "Docker Desktop is running". |
 | **Docker Compose is not available** | Ensure your Docker Desktop is fully updated. Compose is bundled with modern Docker installations. |
 | **Error from registry: denied** | The GitHub Container Registry packages for Cart Radar are currently set to **Private**. **(For the Repo Owner)**: Go to your GitHub repository -> click **Packages** on the right sidebar -> click the package name -> **Package Settings** -> scroll to **Danger Zone** -> **Change visibility** to **Public**. |
