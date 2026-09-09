@@ -96,65 +96,9 @@ Instead of just checking your nearest store, Cart Radar performs a **hex-grid sw
 
 ---
 
-## 🚀 Run Cart Radar Without Coding
+## 🚀 Need Help Running Cart Radar?
 
-> No Python, no Node.js, no terminal knowledge needed — just Docker Desktop.
-
-The launchers automatically download pre-built images from GitHub Container Registry. You never need to compile or build anything.
-
-### Step 1 — Install Docker Desktop (one time only)
-
-Download and install **[Docker Desktop](https://www.docker.com/products/docker-desktop/)** (free, available for macOS, Windows, and Linux).
-
-After installing, open Docker Desktop and wait until it shows **"Docker Desktop is running"** in the menu bar / taskbar.
-
-### Step 2 — Download Cart Radar
-
-Click the green **"Code"** button at **[github.com/Harsh-Gopal/CartRadar](https://github.com/Harsh-Gopal/CartRadar)** → **"Download ZIP"**, then unzip it anywhere you like.
-
-### Step 3 — Double-click the launcher for your OS
-
-| OS | File to double-click | Location |
-|---|---|---|
-| **macOS** | `Cart Radar.command` | Inside the `cart-radar/` folder |
-| **Windows** | `Cart Radar.bat` | Inside the `cart-radar/` folder |
-| **Linux** | `Cart Radar.sh` | Inside the `cart-radar/` folder |
-
-> **macOS note:** The first time you open `Cart Radar.command`, macOS may show a security warning.  
-> Right-click (or Control+click) the file → **Open** → **Open** to allow it.
-
-The launcher automatically:
-1. Checks that Docker Desktop is installed and running — with clear instructions if it isn't.
-2. **Downloads the pre-built Cart Radar images** (~1–2 GB on first launch, instant afterward).
-3. Starts the backend and frontend.
-4. Waits until the app is fully ready.
-5. Opens **[http://localhost:3000](http://localhost:3000)** in your browser.
-
-> **First launch:** Downloading the Docker images takes **2–5 minutes** depending on your internet speed. Subsequent launches take only **a few seconds**.
-
-### How to update to the latest version
-
-Just re-open the launcher — it automatically pulls the newest pre-built image.
-
-### How to stop Cart Radar
-
-- **macOS / Linux:** Close the launcher terminal window — this automatically stops all services.
-- **Windows:** Close the batch window or press any key in it, then run `docker compose down` in the project folder.
-
-### Troubleshooting
-
-| Problem | Fix |
-|---|---|
-| "Docker is not installed" | Download Docker Desktop from the link shown in the launcher |
-| "Docker is not running" | Open Docker Desktop from your Applications / Start menu and wait for it to fully start |
-| Browser opens but shows an error | Wait 30 more seconds and refresh — the backend may still be initializing |
-| Port 3000 is already in use | Stop whatever is using port 3000, or edit `docker-compose.yml` and change `"3000:80"` to e.g. `"3001:80"` |
-| Images fail to download | Check your internet connection; if you have cached images the launcher will try to use those |
-| Something else is broken | Run `docker compose logs` in the project folder and check the output |
-
----
-
-## 🤖 Ask an AI to Help You Run Cart Radar
+> **Full setup documentation:** Please see [`docs/DOCKER_SETUP.md`](docs/DOCKER_SETUP.md) for detailed one-click installation and running instructions.
 
 If you get stuck at any step, paste the following prompt into **ChatGPT**, **Claude**, **Gemini**, or any AI assistant:
 
@@ -171,16 +115,19 @@ Please:
 2. Check whether I have Docker Desktop installed and guide me through the
    installation if I don't (link: https://www.docker.com/products/docker-desktop/).
 3. Guide me step by step to download the repo as a ZIP and unzip it.
-4. Guide me to run the correct launcher file for my OS:
-   - macOS   → double-click "Cart Radar.command" inside the cart-radar/ folder
-   - Windows → double-click "Cart Radar.bat" inside the cart-radar/ folder
-   - Linux   → run "Cart Radar.sh" inside the cart-radar/ folder
-5. Tell me what URL to open once it's running: http://localhost:3000
-6. Help me troubleshoot any Docker startup errors by reading the error
-   messages I paste to you — check the repository README and docs/ folder
+4. Guide me to run the correct installation script for my OS:
+   - macOS   → double-click "Cart Radar Install.command" inside the cart-radar/ folder
+   - Windows → double-click "Cart Radar Install.bat" inside the cart-radar/ folder
+   - Linux   → run "Cart Radar Install.desktop" inside the cart-radar/ folder
+5. Guide me to run the correct launcher file for everyday use:
+   - macOS   → double-click "Cart Radar.command"
+   - Windows → double-click "Cart Radar.bat"
+   - Linux   → run "Cart Radar.desktop"
+6. Tell me what URL to open once it's running: http://localhost:3000
+7. Help me troubleshoot any Docker startup errors by reading the error
+   messages I paste to you — check the repository README and docs/DOCKER_SETUP.md
    for known issues and solutions.
-7. Do not ask me to manually edit code or config files unless absolutely
-   necessary.
+8. Do not ask me to manually edit application source code unless absolutely necessary.
 ```
 
 ---

@@ -1,0 +1,14 @@
+[Desktop Entry]
+Version=1.1
+Type=Application
+Name=Cart Radar Installer
+GenericName=Cart Radar Setup
+Comment=First-time setup for Cart Radar (Downloads Docker Images)
+# Exec uses the absolute path to the installer script placed alongside this .desktop file.
+# %k expands to the path of this .desktop file itself, so dirname gives the project folder.
+Exec=bash -c 'cd "$(dirname "%k")" && bash "Cart Radar Install.sh"'
+Icon=system-software-install
+Terminal=true
+Categories=Network;Utility;
+Keywords=setup;install;cart;radar;
+StartupNotify=true
