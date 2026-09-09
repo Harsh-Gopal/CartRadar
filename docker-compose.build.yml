@@ -1,0 +1,25 @@
+# Cart Radar — Docker Compose override for developers who want to build from source.
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.build.yml up --build
+#
+# This overrides the `image:` directive in docker-compose.yml with `build:` so
+# Docker builds the images locally from the Dockerfiles instead of pulling
+# the pre-built images from GHCR.
+#
+# The ./dev.sh workflow (uv + pnpm, hot reload) remains the recommended
+# developer workflow. Use this file only when you need to test the Docker
+# image build itself.
+
+services:
+  backend:
+    image: null  # Override: build locally instead of pulling from GHCR
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+
+  frontend:
+    image: null  # Override: build locally instead of pulling from GHCR
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile

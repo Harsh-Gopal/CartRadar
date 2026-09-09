@@ -1,0 +1,138 @@
+# Cart Radar — Build and publish Docker images to GitHub Container Registry (GHCR)
+#
+# Triggers:
+#   - Push to `main`            → builds and tags images as `latest` + git SHA
+#   - Push to `additonal`       → builds and tags images as `edge` + git SHA (for testing)
+#   - Manual dispatch           → builds with the selected tag
+#   - Pull request to `main`    → build-only (no push) for CI validation
+#
+# Images published:
+#   ghcr.io/harsh-gopal/cartradar-backend:latest   (FastAPI + uvicorn + Playwright)
+#   ghcr.io/harsh-gopal/cartradar-frontend:latest  (React → nginx reverse-proxy)
+
+name: Publish Docker Images
+
+on:
+  push:
+    branches:
+      - main
+      - additonal
+    paths:
+      # Only rebuild when relevant source files change
+      - "cart-radar/backend/**"
+      - "cart-radar/frontend/**"
+      - "cart-radar/.github/workflows/docker-publish.yml"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "cart-radar/backend/**"
+      - "cart-radar/frontend/**"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Image tag (e.g. v1.2.3). Defaults to 'latest'."
+        required: false
+        default: "latest"
+
+env:
+  REGISTRY: ghcr.io
+  # Images are published under the repo owner's namespace, lowercase
+  BACKEND_IMAGE: ghcr.io/harsh-gopal/cartradar-backend
+  FRONTEND_IMAGE: ghcr.io/harsh-gopal/cartradar-frontend
+
+jobs:
+  build-and-push:
+    name: Build & Push Docker Images
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write  # Required to push to GHCR
+
+    steps:
+      # ── Checkout ────────────────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── Docker Buildx (for multi-platform builds if needed later) ───────────
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # ── Authenticate to GHCR ────────────────────────────────────────────────
+      - name: Log in to GitHub Container Registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # ── Determine image tags ─────────────────────────────────────────────────
+      - name: Compute image tags
+        id: tags
+        run: |
+          SHA="${{ github.sha }}"
+          SHORT_SHA="${SHA:0:7}"
+          BRANCH="${{ github.ref_name }}"
+
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            CUSTOM_TAG="${{ github.event.inputs.tag }}"
+            BACKEND_TAGS="${{ env.BACKEND_IMAGE }}:${CUSTOM_TAG},${{ env.BACKEND_IMAGE }}:${SHORT_SHA}"
+            FRONTEND_TAGS="${{ env.FRONTEND_IMAGE }}:${CUSTOM_TAG},${{ env.FRONTEND_IMAGE }}:${SHORT_SHA}"
+          elif [ "$BRANCH" = "main" ]; then
+            BACKEND_TAGS="${{ env.BACKEND_IMAGE }}:latest,${{ env.BACKEND_IMAGE }}:${SHORT_SHA}"
+            FRONTEND_TAGS="${{ env.FRONTEND_IMAGE }}:latest,${{ env.FRONTEND_IMAGE }}:${SHORT_SHA}"
+          elif [ "$BRANCH" = "additonal" ]; then
+            BACKEND_TAGS="${{ env.BACKEND_IMAGE }}:edge,${{ env.BACKEND_IMAGE }}:${SHORT_SHA}"
+            FRONTEND_TAGS="${{ env.FRONTEND_IMAGE }}:edge,${{ env.FRONTEND_IMAGE }}:${SHORT_SHA}"
+          else
+            # PR or other branch — no push, just build
+            BACKEND_TAGS="${{ env.BACKEND_IMAGE }}:pr-${{ github.event.number }}"
+            FRONTEND_TAGS="${{ env.FRONTEND_IMAGE }}:pr-${{ github.event.number }}"
+          fi
+
+          echo "backend_tags=${BACKEND_TAGS}" >> $GITHUB_OUTPUT
+          echo "frontend_tags=${FRONTEND_TAGS}" >> $GITHUB_OUTPUT
+          echo "short_sha=${SHORT_SHA}" >> $GITHUB_OUTPUT
+
+      # ── Build + push backend ─────────────────────────────────────────────────
+      - name: Build and push backend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./cart-radar/backend
+          file: ./cart-radar/backend/Dockerfile
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.tags.outputs.backend_tags }}
+          # Layer caching via GitHub Actions cache
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,mode=max,scope=backend
+          labels: |
+            org.opencontainers.image.source=https://github.com/Harsh-Gopal/CartRadar
+            org.opencontainers.image.description=Cart Radar backend (FastAPI + uvicorn + Playwright)
+            org.opencontainers.image.revision=${{ github.sha }}
+
+      # ── Build + push frontend ────────────────────────────────────────────────
+      - name: Build and push frontend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./cart-radar/frontend
+          file: ./cart-radar/frontend/Dockerfile
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.tags.outputs.frontend_tags }}
+          cache-from: type=gha,scope=frontend
+          cache-to: type=gha,mode=max,scope=frontend
+          labels: |
+            org.opencontainers.image.source=https://github.com/Harsh-Gopal/CartRadar
+            org.opencontainers.image.description=Cart Radar frontend (React + nginx)
+            org.opencontainers.image.revision=${{ github.sha }}
+
+      # ── Summary ─────────────────────────────────────────────────────────────
+      - name: Print image summary
+        if: github.event_name != 'pull_request'
+        run: |
+          echo "## Docker Images Published" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Image | Tags |" >> $GITHUB_STEP_SUMMARY
+          echo "|---|---|" >> $GITHUB_STEP_SUMMARY
+          echo "| Backend | \`${{ steps.tags.outputs.backend_tags }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Frontend | \`${{ steps.tags.outputs.frontend_tags }}\` |" >> $GITHUB_STEP_SUMMARY

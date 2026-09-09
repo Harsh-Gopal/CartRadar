@@ -2,16 +2,20 @@
 # ============================================================
 #  Cart Radar — macOS one-click launcher
 #  Double-click this file in Finder to start Cart Radar.
+#
+#  Requires: Docker Desktop (free) — https://www.docker.com/products/docker-desktop/
+#  No Python, Node.js, or coding knowledge required.
 # ============================================================
 set -euo pipefail
 
-# Always run from the directory that contains this script,
+# Always run from the directory containing this script,
 # regardless of where the project folder is placed.
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR"
 
 APP_URL="http://localhost:3000"
 COMPOSE_FILE="$SCRIPT_DIR/docker-compose.yml"
+IMAGES=("ghcr.io/harsh-gopal/cartradar-backend:latest" "ghcr.io/harsh-gopal/cartradar-frontend:latest")
 
 # ── Colour helpers ───────────────────────────────────────────
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
@@ -34,7 +38,7 @@ banner "Checking Docker Desktop..."
 
 if ! command -v docker &>/dev/null; then
     fail "Docker is not installed."
-    echo "  Cart Radar runs inside Docker, which keeps your Mac clean"
+    echo "  Cart Radar uses Docker, which keeps your Mac clean"
     echo "  (no Python/Node installation needed)."
     echo ""
     echo "  ➡  Install Docker Desktop (free) from:"
@@ -63,8 +67,7 @@ if ! docker info &>/dev/null 2>&1; then
     for i in $(seq 1 60); do
         sleep 1
         if docker info &>/dev/null 2>&1; then
-            ok "Docker is now running."
-            break
+            ok "Docker is now running."; break
         fi
         printf "."
         if [ "$i" -eq 60 ]; then
@@ -78,17 +81,25 @@ if ! docker info &>/dev/null 2>&1; then
 fi
 ok "Docker Desktop is running."
 
-# ── 3. Start Cart Radar with Docker Compose ─────────────────
-banner "Starting Cart Radar..."
-echo "  (First launch downloads/builds images — this may take a few minutes.)"
-echo "  Subsequent launches are much faster."
+# ── 3. Pull the latest pre-built images ─────────────────────
+banner "Downloading Cart Radar images..."
+echo "  (First launch downloads ~1-2 GB — subsequent launches are instant.)"
+echo "  Pulling from GitHub Container Registry..."
 echo ""
 
-# Pull/build and start in the background
-docker compose -f "$COMPOSE_FILE" up --build --remove-orphans -d 2>&1
+docker compose -f "$COMPOSE_FILE" pull 2>&1 || {
+    warn "Pull failed (you may be offline). Trying to start with cached images..."
+}
+ok "Images ready."
 
-# ── 4. Wait for the frontend to be ready ────────────────────
+# ── 4. Start Cart Radar ──────────────────────────────────────
+banner "Starting Cart Radar..."
+docker compose -f "$COMPOSE_FILE" up --remove-orphans -d 2>&1
+ok "Containers started."
+
+# ── 5. Wait for the app to become ready ─────────────────────
 banner "Waiting for Cart Radar to be ready..."
+echo "  (Backend initializes Playwright on first start — may take up to 90 seconds.)"
 MAX_WAIT=180
 ELAPSED=0
 printf "  "
@@ -98,40 +109,35 @@ while true; do
         ok "Cart Radar is ready!"
         break
     fi
-    sleep 2
-    ELAPSED=$((ELAPSED + 2))
-    printf "."
+    sleep 2; ELAPSED=$((ELAPSED + 2)); printf "."
     if [ "$ELAPSED" -ge "$MAX_WAIT" ]; then
         echo ""
         fail "Cart Radar did not become ready within ${MAX_WAIT}s."
-        echo "  Check the logs for errors:"
-        echo "    docker compose logs --tail=50"
+        echo "  Showing recent logs for diagnosis:"
+        docker compose -f "$COMPOSE_FILE" logs --tail=40 2>&1 || true
         echo ""
-        docker compose -f "$COMPOSE_FILE" logs --tail=30 2>&1 || true
+        echo "  For help, see: https://github.com/Harsh-Gopal/CartRadar/issues"
         read -r -p "  Press Enter to exit..." _
         exit 1
     fi
 done
 
-# ── 5. Open in the default browser ──────────────────────────
+# ── 6. Open in the default browser ──────────────────────────
 banner "Opening Cart Radar in your browser..."
 sleep 1
 open "$APP_URL"
 
 echo ""
-echo -e "${BOLD}  Cart Radar is running at ${CYAN}${APP_URL}${RESET}"
+echo -e "${BOLD}  ✅ Cart Radar is running at ${CYAN}${APP_URL}${RESET}"
 echo ""
-echo "  To stop Cart Radar, close this window and run:"
-echo "    docker compose down"
-echo ""
-echo "  Or run:  docker compose down   in the project folder."
+echo -e "  To update to the latest version, re-open this launcher."
+echo -e "  To stop Cart Radar, close this window (Ctrl+C)."
 echo ""
 echo -e "${YELLOW}  Leave this window open while you use Cart Radar.${RESET}"
-echo "  Press Ctrl+C to stop all services and exit."
 echo ""
 
-# Keep running so the user can see logs; Ctrl+C triggers cleanup
-trap 'echo -e "\n\nStopping Cart Radar..."; docker compose -f "$COMPOSE_FILE" down; echo "Stopped. Goodbye!"; exit 0' INT TERM
+# Keep the window alive, stream logs so it stays informative
+# Ctrl+C triggers cleanup via trap
+trap 'echo -e "\n\n  Stopping Cart Radar..."; docker compose -f "$COMPOSE_FILE" down; echo "  Stopped. Goodbye!"; exit 0' INT TERM
 
-# Stream logs so the window stays alive and informative
 docker compose -f "$COMPOSE_FILE" logs -f 2>&1

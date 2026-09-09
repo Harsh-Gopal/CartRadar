@@ -2,6 +2,10 @@
 # ============================================================
 #  Cart Radar — Linux one-click launcher
 #  Run this script, or double-click "Cart Radar.desktop".
+#
+#  Requires: Docker Engine or Docker Desktop (free)
+#  https://docs.docker.com/engine/install/
+#  No Python, Node.js, or coding knowledge required.
 # ============================================================
 set -euo pipefail
 
@@ -16,6 +20,7 @@ CYAN='\033[0;36m'; BOLD='\033[1m'; RESET='\033[0m'
 
 banner() { echo -e "\n${CYAN}${BOLD}$1${RESET}"; }
 ok()     { echo -e "  ${GREEN}✓${RESET} $1"; }
+warn()   { echo -e "  ${YELLOW}⚠${RESET}  $1"; }
 fail()   { echo -e "\n${RED}✗ ERROR:${RESET} $1\n"; }
 
 clear
@@ -30,7 +35,7 @@ banner "Checking Docker..."
 
 if ! command -v docker &>/dev/null; then
     fail "Docker is not installed."
-    echo "  Install Docker Engine (or Docker Desktop) for Linux:"
+    echo "  Install Docker Engine for Linux:"
     echo "    https://docs.docker.com/engine/install/"
     echo ""
     echo "  After installing, run:  sudo usermod -aG docker \$USER"
@@ -46,13 +51,24 @@ if ! docker info &>/dev/null 2>&1; then
 fi
 ok "Docker is running."
 
-# ── 2. Start Cart Radar ──────────────────────────────────────
-banner "Starting Cart Radar..."
-echo "  (First launch builds images — may take a few minutes.)"
-docker compose -f "$COMPOSE_FILE" up --build --remove-orphans -d 2>&1
+# ── 2. Pull the latest pre-built images ─────────────────────
+banner "Downloading Cart Radar images..."
+echo "  (First launch downloads ~1-2 GB — subsequent launches are instant.)"
+echo "  Pulling from GitHub Container Registry..."
 
-# ── 3. Wait for readiness ────────────────────────────────────
+docker compose -f "$COMPOSE_FILE" pull 2>&1 || {
+    warn "Pull failed (you may be offline). Trying to start with cached images..."
+}
+ok "Images ready."
+
+# ── 3. Start Cart Radar ──────────────────────────────────────
+banner "Starting Cart Radar..."
+docker compose -f "$COMPOSE_FILE" up --remove-orphans -d 2>&1
+ok "Containers started."
+
+# ── 4. Wait for readiness ────────────────────────────────────
 banner "Waiting for Cart Radar to be ready..."
+echo "  (Backend initializes on first start — may take up to 90 seconds.)"
 MAX_WAIT=180; ELAPSED=0
 printf "  "
 while true; do
@@ -63,15 +79,16 @@ while true; do
     if [ "$ELAPSED" -ge "$MAX_WAIT" ]; then
         echo ""
         fail "Cart Radar did not become ready within ${MAX_WAIT}s."
-        echo "  Logs:"; docker compose -f "$COMPOSE_FILE" logs --tail=30 2>&1 || true
+        echo "  Showing recent logs:"
+        docker compose -f "$COMPOSE_FILE" logs --tail=30 2>&1 || true
+        echo "  For help: https://github.com/Harsh-Gopal/CartRadar/issues"
         exit 1
     fi
 done
 
-# ── 4. Open browser ──────────────────────────────────────────
+# ── 5. Open browser ──────────────────────────────────────────
 banner "Opening Cart Radar in your browser..."
 sleep 1
-# Try common Linux browser openers
 xdg-open "$APP_URL" 2>/dev/null || \
   sensible-browser "$APP_URL" 2>/dev/null || \
   firefox "$APP_URL" 2>/dev/null || \
@@ -80,14 +97,13 @@ xdg-open "$APP_URL" 2>/dev/null || \
   echo "  Please open $APP_URL in your browser."
 
 echo ""
-echo -e "${BOLD}  Cart Radar is running at ${CYAN}${APP_URL}${RESET}"
+echo -e "${BOLD}  ✅ Cart Radar is running at ${CYAN}${APP_URL}${RESET}"
 echo ""
-echo "  To stop Cart Radar:"
-echo "    docker compose down"
+echo "  To update to the latest version, re-run this launcher."
+echo "  To stop Cart Radar, press Ctrl+C."
 echo ""
 echo -e "${YELLOW}  Leave this terminal open while you use Cart Radar.${RESET}"
-echo "  Press Ctrl+C to stop all services and exit."
 echo ""
 
-trap 'echo -e "\n\nStopping Cart Radar..."; docker compose -f "$COMPOSE_FILE" down; echo "Stopped."; exit 0' INT TERM
+trap 'echo -e "\n\n  Stopping Cart Radar..."; docker compose -f "$COMPOSE_FILE" down; echo "  Stopped."; exit 0' INT TERM
 docker compose -f "$COMPOSE_FILE" logs -f 2>&1
