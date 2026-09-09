@@ -120,6 +120,9 @@ def test_extract_swiggy_canonical_slug_link() -> None:
 
 
 def test_blinkit_gracefully_falls_back_when_blocked(monkeypatch) -> None:
+    """When Playwright fetch fails (returns None), the result should be 'error'
+    not 'out_of_stock'. A failed check is not the same as confirmed unavailability.
+    """
     client = BlinkitClient(transport=None)
 
     async def fail_fetch(*args, **kwargs):
@@ -131,7 +134,8 @@ def test_blinkit_gracefully_falls_back_when_blocked(monkeypatch) -> None:
         store = await client.resolve_store(12.9716, 77.5946, product_id="10532")
         product = await client.product_at_store("10532", "any", lat=12.9716, lng=77.5946)
         assert store.serviceable is True
-        assert product.status == "out_of_stock"
+        # Playwright failure → error, NOT out_of_stock (to avoid false "unavailable" signals)
+        assert product.status == "error"
         await client.aclose()
 
     asyncio.run(run_checks())

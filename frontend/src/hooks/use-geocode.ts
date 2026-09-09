@@ -33,7 +33,7 @@ export function useGeocode(lat: number | undefined, lng: number | undefined) {
       try {
         const token = localStorage.getItem("mf.token")
         const tokenStr = token ? `?token=${encodeURIComponent(token.replace(/"/g, ''))}` : ""
-        const url = `/api/geocode${tokenStr}${tokenStr ? "&" : "?"}lat=${lat}&lng=${lng}`
+        const url = `/api/reverse_geocode${tokenStr}${tokenStr ? "&" : "?"}lat=${lat}&lng=${lng}`
         
         const res = await fetch(url)
         if (!active) return

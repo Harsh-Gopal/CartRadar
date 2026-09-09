@@ -82,15 +82,24 @@ async def _close_browser():
 
 
 def _parse_snippets(snippets: list[dict], product_id: str) -> ProductResult:
-    """Parse the Blinkit /v1/layout/product snippets into a ProductResult."""
+    """Parse the Blinkit /v1/layout/product snippets into a ProductResult.
+    
+    Stock detection strategy (in order of reliability):
+    1. Explicit inventory widget (`product_pdp_inventory` / `inventory_v2`): inventory > 0 → in stock
+    2. Presence of add-to-cart action (`atc_actions_v2`) on the product snippet → in stock
+       (Blinkit removes the ATC button entirely when out of stock)
+    3. Absence of both → default out_of_stock / not_carried
+    """
     name: str | None = None
     brand: str | None = None
     price: float | None = None
     mrp: float | None = None
     image_url: str | None = None
     raw_quantity: str | None = None
-    is_in_stock: bool = False
+    # None = not yet determined; True/False = explicitly known
+    is_in_stock: bool | None = None
     found_product = False
+    has_atc_action = False  # add-to-cart present → proxy for in-stock
 
     for snippet in snippets:
         data = snippet.get("data", {})
@@ -98,12 +107,15 @@ def _parse_snippets(snippets: list[dict], product_id: str) -> ProductResult:
             continue
 
         widget = data.get("widget")
+
+        # Inventory widget is authoritative when present
         if widget in ("product_pdp_inventory", "inventory", "inventory_v2"):
             inventory = data.get("inventory")
             try:
                 is_in_stock = int(inventory) > 0
             except (TypeError, ValueError):
                 is_in_stock = bool(inventory)
+            log.debug("Blinkit: inventory widget value=%s → is_in_stock=%s", inventory, is_in_stock)
 
         # Primary: snippet with identity.id matching product_id
         identity = data.get("identity", {})
@@ -125,25 +137,25 @@ def _parse_snippets(snippets: list[dict], product_id: str) -> ProductResult:
                             raw_quantity = cart_item.get("unit") or cart_item.get("quantity")
                             break
 
-            # Try atc_actions_v2 → add_to_cart if rfc didn't give price
-            if not mrp or mrp == 0:
-                atc = data.get("atc_actions_v2", {})
-                if isinstance(atc, dict):
-                    for action in atc.get("default", []):
-                        if action and isinstance(action, dict):
-                            cart_item = action.get("add_to_cart", {}).get("cart_item", {})
-                            if cart_item:
-                                if not name:
-                                    name = cart_item.get("product_name") or cart_item.get("display_name")
-                                if not brand:
-                                    brand = cart_item.get("brand")
-                                if not image_url:
-                                    image_url = cart_item.get("image_url")
-                                if not raw_quantity:
-                                    raw_quantity = cart_item.get("unit") or cart_item.get("quantity")
-                                mrp = cart_item.get("mrp") or None
-                                price = cart_item.get("price") or mrp
-                                break
+            # Try atc_actions_v2 → add_to_cart
+            atc = data.get("atc_actions_v2", {})
+            if isinstance(atc, dict) and atc.get("default"):
+                for action in atc.get("default", []):
+                    if action and isinstance(action, dict):
+                        cart_item = action.get("add_to_cart", {}).get("cart_item", {})
+                        if cart_item:
+                            has_atc_action = True  # ATC present → proxy for in-stock
+                            if not name:
+                                name = cart_item.get("product_name") or cart_item.get("display_name")
+                            if not brand:
+                                brand = cart_item.get("brand")
+                            if not image_url:
+                                image_url = cart_item.get("image_url")
+                            if not raw_quantity:
+                                raw_quantity = cart_item.get("unit") or cart_item.get("quantity")
+                            mrp = cart_item.get("mrp") or mrp
+                            price = cart_item.get("price") or price or mrp
+                            break
 
             # Also try direct product_data structure
             if not name:
@@ -168,7 +180,19 @@ def _parse_snippets(snippets: list[dict], product_id: str) -> ProductResult:
                     break
 
     if found_product or name:
-        status = "in_stock" if is_in_stock else "out_of_stock"
+        # Resolve final in-stock status:
+        # If the inventory widget gave an explicit answer, use it.
+        # Otherwise fall back to ATC-action presence (ATC button = can add to cart = in stock).
+        if is_in_stock is not None:
+            final_in_stock = is_in_stock
+        elif has_atc_action:
+            log.debug("Blinkit: no inventory widget, inferring in_stock=True from atc_action presence")
+            final_in_stock = True
+        else:
+            log.debug("Blinkit: no inventory widget and no atc_action → out_of_stock")
+            final_in_stock = False
+
+        status = "in_stock" if final_in_stock else "out_of_stock"
         actual_price = float(price) if price and float(price) > 0 else None
         actual_mrp = float(mrp) if mrp and float(mrp) > 0 else actual_price
         
@@ -351,9 +375,8 @@ class BlinkitClient(PlatformClient):
 
         result = await self._fetch_product_via_playwright(product_id, lat, lng)
         if result is None:
-            log.warning("Blinkit: Playwright fetch returned None for pvid=%s", product_id)
-            # Return out_of_stock instead of error to avoid "Check failed" badge
-            return ProductResult(status="out_of_stock")
+            log.warning("Blinkit: Playwright fetch returned None for pvid=%s — returning error (not out_of_stock) to avoid false unavailable signal", product_id)
+            return ProductResult(status="error")
 
         snippets = result.get("response", {}).get("snippets", [])
         return _parse_snippets(snippets, product_id)

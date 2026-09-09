@@ -1571,7 +1571,7 @@ export function App() {
               <Button
                 variant="outline"
                 className="h-11 w-full"
-                onClick={() => runSearch(false)}
+                onClick={() => runSearch(true)}
               >
                 <HugeiconsIcon icon={Refresh01Icon} data-icon="inline-start" />
                 Re-check stock

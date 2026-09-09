@@ -203,12 +203,17 @@ async def run_search(
         for store in cache.stores_within(lat, lng, radius_km, platform):
             start_check(store)
 
-        # 3. Sweep undiscovered area
-        undiscovered = [
-            p
-            for p in hex_grid(lat, lng, radius_km, GRID_SPACING_KM)
-            if not cache.has_fresh_probe_near(p[0], p[1], PROBE_COVERAGE_KM, platform)
-        ]
+        # 3. Sweep undiscovered area (or ALL area when force=True for re-check)
+        if force:
+            # Force re-check: probe all grid points regardless of cache freshness.
+            # This ensures Re-check stock returns real-time data, not stale probes.
+            undiscovered = list(hex_grid(lat, lng, radius_km, GRID_SPACING_KM))
+        else:
+            undiscovered = [
+                p
+                for p in hex_grid(lat, lng, radius_km, GRID_SPACING_KM)
+                if not cache.has_fresh_probe_near(p[0], p[1], PROBE_COVERAGE_KM, platform)
+            ]
         if probe_budget is not None:
             granted = probe_budget.take_up_to(len(undiscovered))
         else:

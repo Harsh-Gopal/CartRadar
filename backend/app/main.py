@@ -479,8 +479,8 @@ async def stats(request: Request):
     return request.app.state.cache.stats()
 
 
-@app.get("/api/geocode", dependencies=[Depends(require_access)])
-async def geocode(request: Request, lat: float, lng: float):
+@app.get("/api/reverse_geocode", dependencies=[Depends(require_access)])
+async def reverse_geocode(request: Request, lat: float, lng: float):
     if lat < -90 or lat > 90 or lng < -180 or lng > 180:
         raise HTTPException(400, "Invalid coordinates")
     if lat == 0 and lng == 0:
