@@ -1,10 +1,10 @@
 # Cart Radar — Build and publish Docker images to GitHub Container Registry (GHCR)
 #
 # Triggers:
-#   - Push to `main`            → builds and tags images as `latest` + git SHA
-#   - Push to `additonal`       → builds and tags images as `edge` + git SHA (for testing)
-#   - Manual dispatch           → builds with the selected tag
-#   - Pull request to `main`    → build-only (no push) for CI validation
+#   - Push to `main`               → builds and tags images as `latest` + git SHA
+#   - Push to `additional_features` → builds and tags images as `edge` + git SHA (for testing)
+#   - Manual dispatch              → builds with the selected tag
+#   - Pull request to `main`       → build-only (no push) for CI validation
 #
 # Images published:
 #   ghcr.io/harsh-gopal/cartradar-backend:latest   (FastAPI + uvicorn + Playwright)
@@ -16,18 +16,18 @@ on:
   push:
     branches:
       - main
-      - additonal
+      - additional_features
     paths:
       # Only rebuild when relevant source files change
-      - "cart-radar/backend/**"
-      - "cart-radar/frontend/**"
-      - "cart-radar/.github/workflows/docker-publish.yml"
+      - "backend/**"
+      - "frontend/**"
+      - ".github/workflows/docker-publish.yml"
   pull_request:
     branches:
       - main
     paths:
-      - "cart-radar/backend/**"
-      - "cart-radar/frontend/**"
+      - "backend/**"
+      - "frontend/**"
   workflow_dispatch:
     inputs:
       tag:
@@ -82,7 +82,7 @@ jobs:
           elif [ "$BRANCH" = "main" ]; then
             BACKEND_TAGS="${{ env.BACKEND_IMAGE }}:latest,${{ env.BACKEND_IMAGE }}:${SHORT_SHA}"
             FRONTEND_TAGS="${{ env.FRONTEND_IMAGE }}:latest,${{ env.FRONTEND_IMAGE }}:${SHORT_SHA}"
-          elif [ "$BRANCH" = "additonal" ]; then
+          elif [ "$BRANCH" = "additional_features" ]; then
             BACKEND_TAGS="${{ env.BACKEND_IMAGE }}:edge,${{ env.BACKEND_IMAGE }}:${SHORT_SHA}"
             FRONTEND_TAGS="${{ env.FRONTEND_IMAGE }}:edge,${{ env.FRONTEND_IMAGE }}:${SHORT_SHA}"
           else
@@ -99,8 +99,8 @@ jobs:
       - name: Build and push backend image
         uses: docker/build-push-action@v5
         with:
-          context: ./cart-radar/backend
-          file: ./cart-radar/backend/Dockerfile
+          context: ./backend
+          file: ./backend/Dockerfile
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.tags.outputs.backend_tags }}
           # Layer caching via GitHub Actions cache
@@ -115,8 +115,8 @@ jobs:
       - name: Build and push frontend image
         uses: docker/build-push-action@v5
         with:
-          context: ./cart-radar/frontend
-          file: ./cart-radar/frontend/Dockerfile
+          context: ./frontend
+          file: ./frontend/Dockerfile
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.tags.outputs.frontend_tags }}
           cache-from: type=gha,scope=frontend
