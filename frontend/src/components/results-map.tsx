@@ -43,6 +43,18 @@ function FitToRadius({ lat, lng, radiusKm, fitKey }: { lat: number; lng: number;
   return null
 }
 
+function MapResizer() {
+  const map = useMap()
+  useEffect(() => {
+    const observer = new ResizeObserver(() => {
+      map.invalidateSize()
+    })
+    observer.observe(map.getContainer())
+    return () => observer.disconnect()
+  }, [map])
+  return null
+}
+
 function FlyToSelected({ results, selectedId }: { results: StoreResult[]; selectedId: string | null }) {
   const map = useMap()
   useEffect(() => {
@@ -188,6 +200,7 @@ export function ResultsMap({ lat, lng, radiusKm, results, homeStatus, homePrice,
         attribution={TILE_ATTRIBUTION}
         url={TILE_URL}
       />
+      <MapResizer />
       <FitToRadius lat={lat} lng={lng} radiusKm={radiusKm} fitKey={fitKey} />
       <FlyToSelected results={results} selectedId={selectedId} />
       <Circle
