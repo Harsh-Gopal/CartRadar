@@ -12,6 +12,7 @@ from playwright.async_api import async_playwright
 import httpx
 
 from ..base import PlatformClient, PlatformError, ProductResult, StoreResolution
+from ...normalization import parse_quantity
 
 log = logging.getLogger("zepto")
 
@@ -39,7 +40,8 @@ def _parse_product_detail(data: dict, requested_pvid: str) -> ProductResult:
     if not store_products:
         return ProductResult(status="not_carried", name=product.get("name"))
         
-    # Find the specific variant requested, since Zepto returns all variants for a product
+    # Find the specific variant requested — Zepto returns ALL variants for a product family,
+    # so we must select the one matching the pvid from the user's URL.
     target_sp = None
     for sp in store_products:
         variant = sp.get("productVariant") or {}
@@ -47,8 +49,10 @@ def _parse_product_detail(data: dict, requested_pvid: str) -> ProductResult:
             target_sp = sp
             break
             
-    # Fallback to first if requested_pvid isn't found (shouldn't happen on exact match)
-    if not target_sp:
+    # Fallback: if the specific pvid isn't found (e.g. not_carried at this store),
+    # use first entry only to extract metadata — mark as not_carried.
+    not_found_in_store = target_sp is None
+    if not_found_in_store:
         target_sp = store_products[0]
         
     sp = target_sp
@@ -57,17 +61,42 @@ def _parse_product_detail(data: dict, requested_pvid: str) -> ProductResult:
     image_url = f"{CDN_BASE}/{images[0]['path']}" if images else None
     
     # Priority: discountedSellingPrice > sellingPrice > superSaverSellingPrice
+    # Zepto stores prices in paise (1/100 of a rupee)
     price_paise = sp.get("discountedSellingPrice") or sp.get("sellingPrice") or sp.get("superSaverSellingPrice")
     mrp_paise = sp.get("mrp") or variant.get("mrp")
+    price = price_paise / 100 if price_paise else None
+    mrp = mrp_paise / 100 if mrp_paise else None
+    
+    # Determine in-stock status — if the pvid wasn't found in this store's storeProducts,
+    # the product is not_carried regardless of the first entry's outOfStock flag.
+    if not_found_in_store:
+        status = "not_carried"
+    elif sp.get("outOfStock"):
+        status = "out_of_stock"
+    else:
+        status = "in_stock"
+    
+    # Variant label normalization (like all other platforms)
+    # Zepto provides the variant size in productVariant.name (e.g. "750 ml", "2 L x 6")
+    variant_label = variant.get("name") or variant.get("displayName") or ""
+    nq = parse_quantity(variant_label) if variant_label else None
     
     return ProductResult(
-        status="out_of_stock" if sp.get("outOfStock") else "in_stock",
+        status=status,
         name=product.get("name"),
         brand=product.get("brand"),
         image_url=image_url,
-        price=price_paise / 100 if price_paise else None,
-        mrp=mrp_paise / 100 if mrp_paise else None,
+        price=price,
+        mrp=mrp,
         available_quantity=sp.get("availableQuantity"),
+        pack_count=nq.pack_count if nq else None,
+        quantity_per_pack=nq.quantity_per_pack if nq else None,
+        quantity_unit=nq.quantity_unit if nq else None,
+        total_quantity=nq.total_quantity if nq else None,
+        total_quantity_unit=nq.total_quantity_unit if nq else None,
+        price_per_unit=(price / nq.total_quantity) if (price and nq and nq.total_quantity and nq.total_quantity > 0) else None,
+        raw_variant=variant_label or None,
+        quantity_confidence=nq.confidence if nq else None,
     )
 
 

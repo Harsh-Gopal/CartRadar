@@ -57,11 +57,6 @@ async def run_zepto_search(
                             if is_verified_home:
                                 home_product = prod
                             
-                            # If not the verified home store, any returned price is contaminated by the home context
-                            yield_status = status if is_verified_home else ("unknown" if status == "in_stock" else status)
-                            yield_price = prod.price if is_verified_home else None
-                            yield_mrp = prod.mrp if is_verified_home else None
-                            
                             yield {
                                 "type": "store_result",
                                 "store": {
@@ -73,9 +68,9 @@ async def run_zepto_search(
                                     "platform": "zepto"
                                 },
                                 "distance_km": dist,
-                                "status": yield_status,
-                                "price": yield_price,
-                                "mrp": yield_mrp,
+                                "status": status,
+                                "price": prod.price,
+                                "mrp": prod.mrp,
                                 "verified": is_verified_home,
                             }
                         except Exception as e:
@@ -107,8 +102,6 @@ async def run_zepto_search(
                     from ...grid import haversine_km
                     dist = haversine_km(lat, lng, c_store.lat, c_store.lng)
                     
-                    # Cached stores are never the verified serving store for the current search
-                    yield_status = "unknown" if status == "in_stock" else status
                     yield {
                         "type": "store_result",
                         "store": {
@@ -120,9 +113,9 @@ async def run_zepto_search(
                             "platform": "zepto"
                         },
                         "distance_km": dist,
-                        "status": yield_status,
-                        "price": None,
-                        "mrp": None,
+                        "status": status,
+                        "price": prod.price,
+                        "mrp": prod.mrp,
                         "verified": False,
                     }
                 except Exception as e:
@@ -182,8 +175,6 @@ async def run_zepto_search(
                                 from ...grid import haversine_km
                                 dist = haversine_km(lat, lng, new_store.lat, new_store.lng)
                                 
-                                # Discovered stores are never the verified serving store for the current search
-                                yield_status = "unknown" if status == "in_stock" else status
                                 yield {
                                     "type": "store_result",
                                     "store": {
@@ -195,9 +186,9 @@ async def run_zepto_search(
                                         "platform": "zepto"
                                     },
                                     "distance_km": dist,
-                                    "status": yield_status,
-                                    "price": None,
-                                    "mrp": None,
+                                    "status": status,
+                                    "price": prod.price,
+                                    "mrp": prod.mrp,
                                     "verified": False,
                                 }
                             except Exception as e:
