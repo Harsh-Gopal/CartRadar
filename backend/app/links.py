@@ -42,8 +42,8 @@ INSTAMART_SHORT_RE = re.compile(
 )
 # BigBasket product URL: /pd/{product_id}/{slug}/
 BB_PRODUCT_RE = re.compile(r"/pd/(\d+)(?:[/?#]|$)")
-# Blinkit: /pr/{slug}/prid/{numeric_id}
-BLINKIT_PRODUCT_RE = re.compile(r"/pr(?:oduct)?/(?:.*?/prid/)?(\d+)")
+# Blinkit: /prn/{slug}/prid/{id} OR /pr/{slug}/prid/{id} OR /product/{id}
+BLINKIT_PRODUCT_RE = re.compile(r"/prn/[^/]+/prid/(\d+)|/pr(?:n|oduct)?/(?:.*?/prid/)?(\d+)")
 # BB Now: same format as BigBasket (/pd/{numeric_id}/)
 BBNOW_PRODUCT_RE = re.compile(r"/pd/(\d+)(?:[/?#]|$)")
 # Flipkart product ID: /p/{product_id}
@@ -92,7 +92,9 @@ def extract_product_id(text: str) -> tuple[str | None, str | None]:
         return ("bigbasket", m.group(1)) if m else ("bigbasket", None)
     elif platform == "blinkit":
         m = BLINKIT_PRODUCT_RE.search(text)
-        return ("blinkit", m.group(1)) if m else ("blinkit", None)
+        # The regex has two groups: group(1) for /prn/ pattern, group(2) for legacy /pr/
+        pid = (m.group(1) or m.group(2)) if m else None
+        return ("blinkit", pid) if pid else ("blinkit", None)
     elif platform == "bbnow":
         m = BBNOW_PRODUCT_RE.search(text)
         return ("bbnow", m.group(1)) if m else ("bbnow", None)

@@ -25,6 +25,7 @@ import re
 import httpx
 
 from .base import PlatformClient, PlatformError, ProductResult, StoreResolution
+from ..normalization import parse_quantity
 
 log = logging.getLogger("bbnow")
 
@@ -197,6 +198,9 @@ def _html_to_product(html: str, product_id: str) -> ProductResult:
     except (TypeError, ValueError):
         mrp = price
 
+    variant_label = pack_desc if pack_desc else name
+    nq = parse_quantity(variant_label)
+
     return ProductResult(
         status="in_stock" if is_in_stock else "out_of_stock",
         name=name.strip(),
@@ -204,6 +208,14 @@ def _html_to_product(html: str, product_id: str) -> ProductResult:
         image_url=image_url,
         price=price,
         mrp=mrp,
+        pack_count=nq.pack_count if nq else None,
+        quantity_per_pack=nq.quantity_per_pack if nq else None,
+        quantity_unit=nq.quantity_unit if nq else None,
+        total_quantity=nq.total_quantity if nq else None,
+        total_quantity_unit=nq.total_quantity_unit if nq else None,
+        price_per_unit=(price) / nq.total_quantity if (price and nq and nq.total_quantity > 0) else None,
+        raw_variant=variant_label,
+        quantity_confidence=nq.confidence if nq else None
     )
 
 

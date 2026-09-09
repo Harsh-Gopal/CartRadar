@@ -36,6 +36,16 @@ CREATE TABLE IF NOT EXISTS probed_points (
 );
 CREATE INDEX IF NOT EXISTS idx_probed_lat ON probed_points(lat);
 CREATE INDEX IF NOT EXISTS idx_probed_platform ON probed_points(platform);
+CREATE TABLE IF NOT EXISTS address_cache (
+    lat REAL NOT NULL,
+    lng REAL NOT NULL,
+    formatted_address TEXT NOT NULL,
+    short_address TEXT NOT NULL,
+    confidence TEXT NOT NULL,
+    provider TEXT NOT NULL,
+    resolved_at TEXT NOT NULL,
+    PRIMARY KEY (lat, lng)
+);
 """
 
 
@@ -56,6 +66,27 @@ class StoreCache:
         self._db = sqlite3.connect(str(path), check_same_thread=False)
         self._db.execute("PRAGMA journal_mode=WAL")
         self._db.executescript(SCHEMA)
+
+        # Heal any coordinates corrupted by the old averaging bug (one-time migration)
+        self._heal_corrupted_coordinates()
+
+    def _heal_corrupted_coordinates(self) -> None:
+        """Fixes store coordinates that were pushed outwards by the old averaging logic.
+        Locks every store's position back to the exact point of its first probe."""
+        stores = self._db.execute("SELECT id, platform, lat, lng FROM stores").fetchall()
+        for sid, plat, slat, slng in stores:
+            row = self._db.execute(
+                "SELECT lat, lng FROM probed_points WHERE store_id = ? AND platform = ? ORDER BY probed_at ASC LIMIT 1",
+                (sid, plat)
+            ).fetchone()
+            if row:
+                plat_lat, plat_lng = row
+                if abs(plat_lat - slat) > 0.0001 or abs(plat_lng - slng) > 0.0001:
+                    self._db.execute(
+                        "UPDATE stores SET lat = ?, lng = ? WHERE id = ? AND platform = ?",
+                        (plat_lat, plat_lng, sid, plat)
+                    )
+        self._db.commit()
 
     def close(self) -> None:
         self._db.close()
@@ -106,21 +137,54 @@ class StoreCache:
         ).fetchone()
         if row:
             olat, olng, n, r_name, r_city = row
-            nlat, nlng = (olat * n + lat) / (n + 1), (olng * n + lng) / (n + 1)
+            # Do NOT average new coordinates into the existing store location.
+            # The first-discovered coordinate is authoritative — averaging causes
+            # the store to "drift" outwards as the search radius expands, pushing
+            # it outside the user's requested radius filter.
             final_name = store_name or r_name
             final_city = city or r_city
             self._db.execute(
-                "UPDATE stores SET lat=?, lng=?, probe_count=?, last_seen_at=?, "
+                "UPDATE stores SET probe_count=?, last_seen_at=?, "
                 "name=?, city=? WHERE id=? AND platform=?",
-                (nlat, nlng, n + 1, now, final_name, final_city, store_id, platform),
+                (n + 1, now, final_name, final_city, store_id, platform),
             )
-            return Store(store_id, final_name, final_city, nlat, nlng, platform)
+            return Store(store_id, final_name, final_city, olat, olng, platform)
         self._db.execute(
             "INSERT INTO stores (id, platform, name, city, lat, lng, probe_count, discovered_at, last_seen_at) "
             "VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)",
             (store_id, platform, store_name, city, lat, lng, now, now),
         )
         return Store(store_id, store_name, city, lat, lng, platform)
+
+    def get_address(self, lat: float, lng: float):
+        """Get a cached address for the coordinates."""
+        row = self._db.execute(
+            "SELECT formatted_address, short_address, confidence, provider FROM address_cache WHERE lat = ? AND lng = ?",
+            (lat, lng)
+        ).fetchone()
+        
+        if row:
+            from .geocoder import AddressResult
+            return AddressResult(
+                formatted_address=row[0],
+                short_address=row[1],
+                confidence=row[2],
+                provider=row[3]
+            )
+        return None
+
+    def save_address(self, lat: float, lng: float, result):
+        """Save a resolved address to the cache."""
+        now = datetime.now(timezone.utc).isoformat()
+        with self._db:
+            self._db.execute(
+                """
+                INSERT OR REPLACE INTO address_cache 
+                (lat, lng, formatted_address, short_address, confidence, provider, resolved_at) 
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (lat, lng, result.formatted_address, result.short_address, result.confidence, result.provider, now)
+            )
 
     def record_probe(
         self,

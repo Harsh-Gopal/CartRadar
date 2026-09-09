@@ -1,11 +1,20 @@
 export interface ProductInfo {
-  status: "in_stock" | "out_of_stock" | "not_carried" | "error"
+  status: "in_stock" | "out_of_stock" | "not_carried" | "error" | "unknown"
   name: string | null
   brand: string | null
   image_url: string | null
   price: number | null
   mrp: number | null
   available_quantity: number | null
+  // Normalized quantity and pack fields
+  pack_count?: number | null
+  quantity_per_pack?: number | null
+  quantity_unit?: string | null
+  total_quantity?: number | null
+  total_quantity_unit?: string | null
+  price_per_unit?: number | null
+  raw_variant?: string | null
+  quantity_confidence?: string | null
 }
 
 export interface ResolveResponse {
@@ -52,6 +61,8 @@ export interface StoreResult {
   price: number | null
   mrp: number | null
   platform?: string
+  verified?: boolean
+  product?: ProductInfo | null
 }
 
 export interface SearchSummary {

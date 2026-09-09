@@ -31,6 +31,15 @@ class ProductResult:
     price: float | None = None
     mrp: float | None = None
     available_quantity: int | None = None
+    # Normalized quantity and pack fields
+    pack_count: int | None = None
+    quantity_per_pack: float | None = None
+    quantity_unit: str | None = None
+    total_quantity: float | None = None
+    total_quantity_unit: str | None = None
+    price_per_unit: float | None = None
+    raw_variant: str | None = None
+    quantity_confidence: str | None = None
 
 
 class PlatformError(Exception):

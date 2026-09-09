@@ -32,6 +32,7 @@ from .platforms.flipkart import FlipkartClient, FlipkartMinutesClient
 from .ratelimit import ConcurrencyGate, RateLimiter, TokenBucket
 from .search import run_search
 from .store_cache import StoreCache
+from .geocoder import NominatimProvider
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
 log = logging.getLogger("main")
@@ -66,6 +67,7 @@ def _create_clients() -> dict[str, PlatformClient]:
 async def lifespan(app: FastAPI):
     app.state.clients = _create_clients()
     app.state.cache = StoreCache(config.DATABASE_PATH)
+    app.state.geocoder = NominatimProvider()
     app.state.limiter = RateLimiter(
         request_capacity=config.REQUEST_BURST,
         request_refill_per_sec=config.REQUESTS_PER_MIN / 60,
@@ -92,6 +94,8 @@ async def lifespan(app: FastAPI):
         except Exception:
             pass
     app.state.cache.close()
+    if hasattr(app.state, "geocoder") and hasattr(app.state.geocoder, "close"):
+        await app.state.geocoder.close()
 
 
 
@@ -473,6 +477,32 @@ async def list_platforms(request: Request):
 @app.get("/api/stats", dependencies=[Depends(require_access)])
 async def stats(request: Request):
     return request.app.state.cache.stats()
+
+
+@app.get("/api/geocode", dependencies=[Depends(require_access)])
+async def geocode(request: Request, lat: float, lng: float):
+    if lat < -90 or lat > 90 or lng < -180 or lng > 180:
+        raise HTTPException(400, "Invalid coordinates")
+    if lat == 0 and lng == 0:
+        raise HTTPException(400, "Suspicious coordinates (0,0)")
+        
+    cache = request.app.state.cache
+    # Round to 4 decimal places for deduplication (approx 11m precision)
+    r_lat = round(lat, 4)
+    r_lng = round(lng, 4)
+    
+    cached = cache.get_address(r_lat, r_lng)
+    if cached:
+        return cached.dict()
+        
+    geocoder = request.app.state.geocoder
+    result = await geocoder.reverse_geocode(lat, lng)
+    
+    if result:
+        cache.save_address(r_lat, r_lng, result)
+        return result.dict()
+        
+    raise HTTPException(503, "Failed to resolve address")
 
 
 if config.STATIC_DIR.is_dir():
