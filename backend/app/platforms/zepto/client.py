@@ -31,19 +31,35 @@ class ZeptoNetworkError(ZeptoError):
     pass
 
 
-def _parse_product_detail(data: dict) -> ProductResult:
+def _parse_product_detail(data: dict, requested_pvid: str) -> ProductResult:
     if (data.get("fallbackType") or "NONE") != "NONE":
         return ProductResult(status="not_carried", name=(data.get("product") or {}).get("name"))
     product = data.get("product") or {}
     store_products = product.get("storeProducts") or []
     if not store_products:
         return ProductResult(status="not_carried", name=product.get("name"))
-    sp = store_products[0]
+        
+    # Find the specific variant requested, since Zepto returns all variants for a product
+    target_sp = None
+    for sp in store_products:
+        variant = sp.get("productVariant") or {}
+        if variant.get("id") == requested_pvid:
+            target_sp = sp
+            break
+            
+    # Fallback to first if requested_pvid isn't found (shouldn't happen on exact match)
+    if not target_sp:
+        target_sp = store_products[0]
+        
+    sp = target_sp
     variant = sp.get("productVariant") or {}
     images = variant.get("images") or product.get("images") or []
     image_url = f"{CDN_BASE}/{images[0]['path']}" if images else None
-    price_paise = sp.get("discountedSellingPrice") or sp.get("superSaverSellingPrice")
+    
+    # Priority: discountedSellingPrice > sellingPrice > superSaverSellingPrice
+    price_paise = sp.get("discountedSellingPrice") or sp.get("sellingPrice") or sp.get("superSaverSellingPrice")
     mrp_paise = sp.get("mrp") or variant.get("mrp")
+    
     return ProductResult(
         status="out_of_stock" if sp.get("outOfStock") else "in_stock",
         name=product.get("name"),
@@ -266,7 +282,7 @@ class ZeptoPlaywrightSession:
             raise ZeptoNetworkError(f"Product API failed: HTTP {api_resp.status} - {text}")
         
         product_data = await api_resp.json()
-        return _parse_product_detail(product_data)
+        return _parse_product_detail(product_data, pvid)
 
 
 class ZeptoClient(PlatformClient):
