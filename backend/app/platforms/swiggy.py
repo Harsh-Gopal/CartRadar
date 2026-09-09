@@ -83,7 +83,7 @@ async def _fetch_page(product_id: str, lat: float | None = None, lng: float | No
         return ""
 
 
-def _extract_redux(html: str) -> dict:
+def _extract_redux(html: str, product_id: str = "") -> dict:
     """
     Extract key fields from the embedded Redux state in the page HTML.
 
@@ -98,6 +98,11 @@ def _extract_redux(html: str) -> dict:
       - price: float | None
       - mrp: float | None
       - image_url: str | None
+      - raw_quantity: str | None   (the variant's quantityDescription)
+
+    When product_id is supplied, the function tries to match it against
+    the variation-level skuId so that the price/qty reflect the *exact*
+    variant the user pasted, not the default first variation.
     """
     result: dict[str, Any] = {
         "store_id": None,
@@ -140,8 +145,8 @@ def _extract_redux(html: str) -> dict:
     # ── Product data (productV2.itemData) ────────────────────────────────────
     prod_idx = html.find('"productV2"')
     if prod_idx >= 0:
-        # We need a generous window — the itemData can be large
-        chunk = html[prod_idx: prod_idx + 5000]
+        # Large window — itemData + variations can be several KB
+        chunk = html[prod_idx: prod_idx + 20000]
 
         name_m = re.search(r'"displayName"\s*:\s*"([^"]+)"', chunk)
         brand_m = re.search(r'"brand"\s*:\s*"([^"]+)"', chunk)
@@ -153,27 +158,80 @@ def _extract_redux(html: str) -> dict:
         result["in_stock"] = (instock_m.group(1) == "true") if instock_m else None
         result["is_avail"] = (isavail_m.group(1) == "true") if isavail_m else None
 
-        pack_m = re.search(r'"quantity"\s*:\s*"([^"]+)"', chunk)
-        if not pack_m:
-            pack_m = re.search(r'"pack_size"\s*:\s*"([^"]+)"', chunk)
-        if not pack_m:
-            pack_m = re.search(r'"weight"\s*:\s*"([^"]+)"', chunk)
-        if pack_m:
-            result["raw_quantity"] = pack_m.group(1)
+        # ── Variant selection: parse the variations array ─────────────────────
+        # Each variation block starts with {"skuId":"..." and contains:
+        #   skuId, quantityDescription, offerPrice, mrp
+        # We try to match product_id against skuId, else fall back to first variation.
+        #
+        # Pattern: find each variation block between skuId occurrences
+        var_blocks = re.split(r'(?=\{"skuId"\s*:)', chunk)
+        matched_block: str | None = None
+        listing_block: str | None = None
+        first_block: str | None = None
 
-        # Price (offerPrice)
-        offer_m = re.search(
-            r'"offerPrice"\s*:\s*\{"currencyCode"\s*:\s*"INR"\s*,\s*"units"\s*:\s*"(\d+)"', chunk
-        )
-        mrp_m = re.search(
-            r'"mrp"\s*:\s*\{"currencyCode"\s*:\s*"INR"\s*,\s*"units"\s*:\s*"(\d+)"', chunk
-        )
-        if offer_m:
-            result["price"] = float(offer_m.group(1))
-        if mrp_m:
-            result["mrp"] = float(mrp_m.group(1))
+        for blk in var_blocks:
+            if not blk.startswith('{"skuId"'):
+                continue
+            if first_block is None:
+                first_block = blk
+            
+            sku_m = re.search(r'"skuId"\s*:\s*"([^"]+)"', blk)
+            spin_m = re.search(r'"spinId"\s*:\s*"([^"]+)"', blk)
+            is_listing = '"listingVariant":true' in blk.replace(" ", "")
 
-        # Image (first imageId)
+            if product_id:
+                if sku_m and sku_m.group(1) == product_id:
+                    matched_block = blk
+                    break
+                if spin_m and spin_m.group(1) == product_id:
+                    matched_block = blk
+                    break
+            
+            if is_listing and not listing_block:
+                listing_block = blk
+
+        # Priority: exact ID match > listingVariant flag > first variation
+        target_block = matched_block or listing_block or first_block
+
+        if target_block:
+            qty_m = re.search(r'"quantityDescription"\s*:\s*"([^"]+)"', target_block)
+            offer_m = re.search(
+                r'"offerPrice"\s*:\s*\{"currencyCode"\s*:\s*"INR"\s*,\s*"units"\s*:\s*"(\d+)"',
+                target_block
+            )
+            mrp_m = re.search(
+                r'"mrp"\s*:\s*\{"currencyCode"\s*:\s*"INR"\s*,\s*"units"\s*:\s*"(\d+)"',
+                target_block
+            )
+            if qty_m:
+                result["raw_quantity"] = qty_m.group(1)
+            if offer_m:
+                result["price"] = float(offer_m.group(1))
+            if mrp_m:
+                result["mrp"] = float(mrp_m.group(1))
+        else:
+            # Fallback for pages that don't use the variations structure
+            # (older product types: check for quantity/pack_size/weight at itemData level)
+            pack_m = (
+                re.search(r'"quantityDescription"\s*:\s*"([^"]+)"', chunk) or
+                re.search(r'"quantity"\s*:\s*"([^"]+)"', chunk) or
+                re.search(r'"pack_size"\s*:\s*"([^"]+)"', chunk) or
+                re.search(r'"weight"\s*:\s*"([^"]+)"', chunk)
+            )
+            if pack_m:
+                result["raw_quantity"] = pack_m.group(1)
+            offer_m = re.search(
+                r'"offerPrice"\s*:\s*\{"currencyCode"\s*:\s*"INR"\s*,\s*"units"\s*:\s*"(\d+)"', chunk
+            )
+            mrp_m = re.search(
+                r'"mrp"\s*:\s*\{"currencyCode"\s*:\s*"INR"\s*,\s*"units"\s*:\s*"(\d+)"', chunk
+            )
+            if offer_m:
+                result["price"] = float(offer_m.group(1))
+            if mrp_m:
+                result["mrp"] = float(mrp_m.group(1))
+
+        # Image (first imageId from itemData)
         img_m = re.search(r'"imageIds"\s*:\s*\["([^"]+)"', chunk)
         if img_m:
             result["image_url"] = f"{CDN_BASE}/{img_m.group(1)}"
@@ -300,7 +358,7 @@ class SwiggyClient(PlatformClient):
         async with self._semaphore:
             html = await _fetch_page(pid, lat, lng)
 
-        data = _extract_redux(html)
+        data = _extract_redux(html, pid)
         store_id = data.get("store_id")
         eta = data.get("eta_minutes")
         
@@ -352,7 +410,7 @@ class SwiggyClient(PlatformClient):
             async with self._semaphore:
                 html = await _fetch_page(product_id)
 
-        data = _extract_redux(html)
+        data = _extract_redux(html, product_id)
         result = _data_to_product(data, product_id)
 
         async with self._store_cache_lock:
@@ -364,5 +422,5 @@ class SwiggyClient(PlatformClient):
         """Direct location check (used by _simple_flow fallback if needed)."""
         async with self._semaphore:
             html = await _fetch_page(product_id, lat, lng)
-        data = _extract_redux(html)
+        data = _extract_redux(html, product_id)
         return _data_to_product(data, product_id)

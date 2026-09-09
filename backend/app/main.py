@@ -65,6 +65,9 @@ def _create_clients() -> dict[str, PlatformClient]:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    import os
+    port = os.getenv("PORT", "8000")
+    log.info(f"Cart Radar backend starting up... (Listening on port {port} typically)")
     app.state.clients = _create_clients()
     app.state.cache = StoreCache(config.DATABASE_PATH)
     app.state.geocoder = NominatimProvider()
@@ -263,6 +266,8 @@ async def resolve_link(body: ResolveRequest, request: Request):
         raise HTTPException(422, f"Couldn't find a product ID in that {client.display_name} link.")
 
     # Fetch a product card for display
+    from .platforms.base import ProductResult
+    product = None
     try:
         if platform_name == "zepto":
             # Zepto uses Playwright to organically fetch metadata & handle WAF
@@ -273,11 +278,9 @@ async def resolve_link(body: ResolveRequest, request: Request):
                 product = res.get("product")
                 if not product and res.get("error_reason"):
                     # If we hit a WAF/Playwright error, return a fallback so the UI doesn't 500
-                    from .platforms.base import ProductResult
                     product = ProductResult(status="error", name="Zepto Product", image_url="")
             except Exception as e:
-                log.warning("Zepto metadata fetch via Playwright failed: %s", e)
-                from .platforms.base import ProductResult
+                log.error("Zepto metadata fetch via Playwright failed for %s: %s", url, e)
                 product = ProductResult(status="error", name="Zepto Product", image_url="")
         elif platform_name == "flipkart_minutes":
             # Delegate metadata extraction to the robust normal Flipkart client (uses ld+json API)
@@ -287,22 +290,34 @@ async def resolve_link(body: ResolveRequest, request: Request):
         else:
             # Other platforms: try product_at_location if coords are available
             if body.lat is not None and body.lng is not None:
-                product = await client.product_at_location(product_id, body.lat, body.lng)
+                try:
+                    product = await client.product_at_location(product_id, body.lat, body.lng)
+                except Exception as e:
+                    log.error("%s location metadata fetch failed for %s: %s", client.display_name, url, e)
+                    product = None
             else:
                 # No coords — fetch metadata using fallback location (New Delhi — major Swiggy market)
                 try:
                     product = await client.product_at_store(product_id, "dummy", 28.6139, 77.2090)
                 except Exception as e:
-                    log.warning("Fallback metadata fetch failed: %s", e)
+                    log.error("%s fallback metadata fetch failed for %s: %s", client.display_name, url, e)
                     product = None
     except PlatformError as e:
+        log.error("PlatformError during resolve for %s: %s", url, e)
         raise HTTPException(502, f"{client.display_name} API error: {e}")
+    except Exception as e:
+        log.error("Unexpected error during resolve for %s: %s", url, e)
+        # We don't raise 500 so frontend can handle gracefully, we return error product
+        pass
+
+    if not product:
+        product = ProductResult(status="error", name="Product Not Found", image_url="")
 
     return {
         "pvid": product_id,
         "platform": platform_name,
         "display_name": client.display_name,
-        "product": asdict(product) if product else None,
+        "product": asdict(product),
     }
 
 

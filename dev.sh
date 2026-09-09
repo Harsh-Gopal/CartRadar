@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Run backend (:8400) + frontend (:5173) together. Ctrl+C stops both.
+# Run backend (:8000) + frontend (:5173) together. Ctrl+C stops both.
 set -e
 cd "$(dirname "$0")"
 

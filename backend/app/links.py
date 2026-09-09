@@ -28,17 +28,21 @@ PLATFORM_HOSTS: dict[str, tuple[str, ...]] = {
 
 # -- Per-platform product ID regexes ----------------------------------------
 # Swiggy Instamart product URL patterns:
-#   swiggy.com:   /instamart/item/{id}  or  /instamart/p/{slug}-{id}
-#                 /stores/instamart/item/{id}
+#   swiggy.com:   /instamart/item/{id}  or  /instamart/item/{slug}/{id}
+#                 /stores/instamart/item/{id}  or  /stores/instamart/item/{slug}/{id}
+#                 /instamart/p/{slug}-{id}
 #   instamart.in: /item/{id}?share=true  or  /p/{slug}-{id}
-# We use two patterns and pick whichever matches.
+#
+# Strategy: the product ID is always the LAST path segment before ? or # or end-of-string.
+# Swiggy IDs are alphanumeric (uppercase letters + digits), no dashes/underscores in the ID itself.
+# We match the last path component after /item/ or /p/ that is ≥4 chars of [A-Za-z0-9].
 SWIGGY_PRODUCT_RE = re.compile(
-    r"/(?:stores/)?instamart/(?:item|p)/(?:.*-)?([A-Za-z0-9_-]+)(?:[/?#]|$)"
+    r"/(?:stores/)?instamart/(?:item|p)/(?:[^/?#]*/)*(?:[^/?#-]+-)*([A-Za-z0-9]{4,})(?:[/?#]|$)"
 )
 # instamart.in short-links: https://instamart.in/item/{ID}?share=true
 #                           https://instamart.in/p/{slug}-{ID}
 INSTAMART_SHORT_RE = re.compile(
-    r"instamart\.in/(?:item|p)/(?:.*-)?([A-Za-z0-9]{6,})(?:[/?#]|$)"
+    r"instamart\.in/(?:item|p)/(?:[^/?#]*/)*(?:[^/?#-]+-)*([A-Za-z0-9]{6,})(?:[/?#]|$)"
 )
 # BigBasket product URL: /pd/{product_id}/{slug}/
 BB_PRODUCT_RE = re.compile(r"/pd/(\d+)(?:[/?#]|$)")

@@ -100,35 +100,6 @@ def _parse_product_detail(data: dict, requested_pvid: str) -> ProductResult:
     )
 
 
-class ZeptoClient(PlatformClient):
-    def __init__(self, *args, **kwargs):
-        pass
-
-    @property
-    def platform_name(self) -> str:
-        return "zepto"
-
-    @property
-    def display_name(self) -> str:
-        return "Zepto"
-
-    @property
-    def supports_sweep(self) -> bool:
-        return True
-
-    @property
-    def supports_geocoding(self) -> bool:
-        return False
-
-    async def aclose(self) -> None:
-        pass
-
-    async def resolve_store(self, lat: float, lng: float, product_id: str | None = None) -> StoreResolution:
-        raise NotImplementedError("Zepto now uses fetch_availability_playwright directly.")
-
-    async def product_at_store(self, product_id: str, store_id: str, lat: float | None = None, lng: float | None = None) -> ProductResult:
-        raise NotImplementedError("Zepto now uses fetch_availability_playwright directly.")
-
 class ZeptoPlaywrightSession:
     """Manages a single Playwright browser context for Zepto sweeps to avoid WAF blocks."""
     def __init__(self):
