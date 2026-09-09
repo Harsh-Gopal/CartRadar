@@ -13,6 +13,26 @@ if [ -f .env ]; then
   [ -n "$PROXY_URL" ] && echo "==> PROXY_URL set — routing calls through the proxy"
 fi
 
+echo "==> Checking Node.js version..."
+if ! command -v node >/dev/null 2>&1; then
+  echo "❌ ERROR: Node.js is not installed."
+  echo "Please install Node.js 22 (e.g. 'brew install node@22' or 'nvm install 22')."
+  exit 1
+fi
+
+NODE_MAJOR=$(node -v | cut -d'v' -f2 | cut -d'.' -f1)
+if [ "$NODE_MAJOR" -lt 22 ]; then
+  echo "❌ ERROR: Node.js v22 or higher is required (current: $(node -v))."
+  echo "This is required by pnpm 11+ and for 'node:sqlite' support."
+  echo ""
+  echo "To upgrade on macOS Apple Silicon:"
+  echo "  Using nvm:  nvm install 22 && nvm use 22"
+  echo "  Using brew: brew install node@22"
+  echo ""
+  exit 1
+fi
+
+
 echo "==> Backend deps"
 (cd backend && uv sync --quiet)
 echo "==> Frontend deps"
