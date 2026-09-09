@@ -91,7 +91,12 @@ docker compose -f "%COMPOSE_FILE%" pull
 if %ERRORLEVEL% neq 0 (
     echo.
     echo   ERROR: Failed to download Cart Radar images.
-    echo   Check your internet connection and try again.
+    echo   If you see an 'error from registry: denied' message, the GitHub
+    echo   Container Registry packages might currently be set to Private.
+    echo   Please see docs/DOCKER_SETUP.md for instructions on how the
+    echo   repository owner must make them Public.
+    echo.
+    echo   Otherwise, check your internet connection and try again.
     pause
     exit /b 1
 )

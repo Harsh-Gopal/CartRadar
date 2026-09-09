@@ -65,7 +65,10 @@ docker compose -f "%COMPOSE_FILE%" up --remove-orphans -d
 if %ERRORLEVEL% neq 0 (
     echo.
     echo   ERROR: Failed to start Cart Radar.
-    echo   Check the output above for details.
+    echo   If the error says 'registry: denied', the GHCR packages are Private.
+    echo   Please see docs/DOCKER_SETUP.md for instructions on how to make them Public.
+    echo.
+    echo   Otherwise, check the output above for details.
     pause
     exit /b 1
 )

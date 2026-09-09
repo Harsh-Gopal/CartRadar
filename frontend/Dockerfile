@@ -20,6 +20,8 @@ RUN pnpm build
 # ── Stage 2: serve with nginx ────────────────────────────────────────────────
 FROM nginx:1.27-alpine
 
+LABEL org.opencontainers.image.source=https://github.com/Harsh-Gopal/CartRadar
+
 # Copy built assets
 COPY --from=builder /app/dist /usr/share/nginx/html
 

@@ -49,7 +49,10 @@ banner "Starting Cart Radar..."
 docker compose -f "$COMPOSE_FILE" up --remove-orphans -d 2>&1
 if [ $? -ne 0 ]; then
     fail "Failed to start Docker containers."
-    echo "  Please check the error message above."
+    echo "  If the error says 'registry: denied', the GHCR packages are Private."
+    echo "  Please see docs/DOCKER_SETUP.md for instructions on how to make them Public."
+    echo "  Otherwise, please check the error message above."
+    read -r -p "  Press Enter to exit..." _
     exit 1
 fi
 ok "Containers started."

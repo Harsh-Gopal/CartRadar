@@ -4,6 +4,15 @@ This guide explains how to install and run Cart Radar using Docker Desktop. You 
 
 ---
 
+## How it Works (GHCR Architecture)
+
+Cart Radar uses **GitHub Container Registry (GHCR)** to distribute pre-built Docker images. This means:
+*   The images are built automatically by GitHub Actions whenever code is updated.
+*   The images (`cartradar-frontend` and `cartradar-backend`) are stored publicly at `ghcr.io`.
+*   You **do not** need a Docker Hub account, a GitHub account, or any personal access tokens to download and run the software.
+
+---
+
 ## Option A — One-click installation (First time only)
 
 The installation process checks if Docker is installed, guides you if it isn't, and downloads the Cart Radar Docker images.
@@ -38,7 +47,7 @@ Use these scripts whenever you want to start Cart Radar.
 * **Windows:** Close the command prompt window.
 
 ### Updating Cart Radar
-Whenever you launch Cart Radar using the run scripts, it automatically checks for and downloads the newest pre-built image in the background.
+Whenever you launch Cart Radar using the run scripts, it automatically checks for and pulls the newest pre-built image in the background.
 
 ---
 
@@ -84,6 +93,7 @@ docker compose up -d --remove-orphans
 | **Docker is not installed** | Download and install Docker Desktop from [docker.com](https://www.docker.com/products/docker-desktop/). |
 | **Docker is not running** | Open the Docker Desktop application from your Applications / Start menu. Wait for the icon in the menu bar/taskbar to stop animating and say "Docker Desktop is running". |
 | **Docker Compose is not available** | Ensure your Docker Desktop is fully updated. Compose is bundled with modern Docker installations. |
+| **Error from registry: denied** | The GitHub Container Registry packages for Cart Radar are currently set to **Private**. **(For the Repo Owner)**: Go to your GitHub repository -> click **Packages** on the right sidebar -> click the package name -> **Package Settings** -> scroll to **Danger Zone** -> **Change visibility** to **Public**. |
 | **Image pull fails / network error** | Check your internet connection. The initial download is large (1-2 GB). |
 | **Port 3000 is already in use** | Stop any other application using port 3000. Alternatively, open `docker-compose.yml` in a text editor and change the frontend ports from `"3000:80"` to `"3001:80"`. |
 | **Browser doesn't open automatically** | Manually open your web browser and go to `http://localhost:3000`. |

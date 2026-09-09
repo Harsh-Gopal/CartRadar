@@ -67,9 +67,15 @@ echo "  Downloading pre-built images from GitHub Container Registry."
 echo "  This requires ~1-2 GB and may take a few minutes."
 echo ""
 
-docker compose -f "$COMPOSE_FILE" pull
-if [ $? -ne 0 ]; then
-    fail "Failed to download Cart Radar images. Check your internet connection and try again."
+if ! docker compose -f "$COMPOSE_FILE" pull; then
+    fail "Failed to download Cart Radar images."
+    echo "  If you see an 'error from registry: denied' message, the GitHub"
+    echo "  Container Registry packages might currently be set to Private."
+    echo "  Please see docs/DOCKER_SETUP.md for instructions on how the"
+    echo "  repository owner must make them Public."
+    echo ""
+    echo "  Otherwise, check your internet connection and try again."
+    read -r -p "  Press Enter to exit..." _
     exit 1
 fi
 ok "Successfully downloaded Cart Radar."
