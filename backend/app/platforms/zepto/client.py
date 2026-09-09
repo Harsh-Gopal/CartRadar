@@ -320,7 +320,7 @@ class ZeptoClient(PlatformClient):
         async with ZeptoPlaywrightSession() as session:
             try:
                 res = await session.probe_location(lat, lng)
-                if not res.serviceable or not res.store_id:
+                if not res.get("serviceable") or not res.get("store_id"):
                     return {
                         "serviceable": False,
                         "store_id": None,
@@ -328,7 +328,7 @@ class ZeptoClient(PlatformClient):
                         "error_reason": None
                     }
                 
-                product_result = await session.check_product(res.store_id, pvid)
+                product_result = await session.check_product(res.get("store_id"), pvid)
                 
                 # Zepto API strips product metadata (name, image) if not carried at the requested store.
                 # If name is None, try known major dark stores just to extract the global product metadata.
@@ -341,7 +341,7 @@ class ZeptoClient(PlatformClient):
                         "b8aed0f4-59e0-4387-825d-406800150b71"  # DEL: Shahdara
                     ]
                     for fs_id in fallback_stores:
-                        if fs_id == res.store_id:
+                        if fs_id == res.get("store_id"):
                             continue
                         try:
                             fallback_res = await session.check_product(fs_id, pvid)
@@ -356,7 +356,7 @@ class ZeptoClient(PlatformClient):
 
                 return {
                     "serviceable": True,
-                    "store_id": res.store_id,
+                    "store_id": res.get("store_id"),
                     "product": product_result,
                     "error_reason": None
                 }
