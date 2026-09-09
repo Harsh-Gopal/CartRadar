@@ -81,14 +81,37 @@ async def _close_browser():
             _PLAYWRIGHT = None
 
 
+def _parse_price_text(text: str | None) -> float | None:
+    """Extract numeric price from Blinkit's text like '₹160' or '160'."""
+    if not text:
+        return None
+    # Strip currency symbols and whitespace, keep digits and decimal point
+    cleaned = re.sub(r"[^\d.]", "", str(text))
+    try:
+        val = float(cleaned)
+        return val if val > 0 else None
+    except (ValueError, TypeError):
+        return None
+
+
 def _parse_snippets(snippets: list[dict], product_id: str) -> ProductResult:
     """Parse the Blinkit /v1/layout/product snippets into a ProductResult.
-    
-    Stock detection strategy (in order of reliability):
-    1. Explicit inventory widget (`product_pdp_inventory` / `inventory_v2`): inventory > 0 → in stock
-    2. Presence of add-to-cart action (`atc_actions_v2`) on the product snippet → in stock
-       (Blinkit removes the ATC button entirely when out of stock)
-    3. Absence of both → default out_of_stock / not_carried
+
+    Stock detection strategy (in priority order):
+    1. `inventory`, `is_sold_out`, `product_state` fields on the identity-matched
+       snippet — these are the most direct and reliable signals in Blinkit's API.
+       NOTE: The `widget` field is always None/absent in Blinkit's actual API
+       responses; do NOT rely on widget-type filtering.
+    2. `stepper_data.state.title.text == "enabled"` as a proxy for add-to-cart
+       being available (= in stock).
+    3. `tracking.common_attributes` for price, mrp, state, inventory.
+    4. `rfc_actions_v2` / `atc_actions_v2` for product name, brand, image, price.
+
+    Explicitly distinguishes:
+    - `in_stock`: product is available for purchase at this location
+    - `out_of_stock`: product is known to be unavailable (sold out)
+    - `not_carried`: product not found in response (may not be sold at this store)
+    - `error`: returned by the caller when Playwright itself fails
     """
     name: str | None = None
     brand: str | None = None
@@ -96,55 +119,82 @@ def _parse_snippets(snippets: list[dict], product_id: str) -> ProductResult:
     mrp: float | None = None
     image_url: str | None = None
     raw_quantity: str | None = None
-    # None = not yet determined; True/False = explicitly known
+
+    # Tri-state: None = not yet determined; True/False = explicitly known
     is_in_stock: bool | None = None
     found_product = False
-    has_atc_action = False  # add-to-cart present → proxy for in-stock
 
     for snippet in snippets:
         data = snippet.get("data", {})
         if not data:
             continue
 
-        widget = data.get("widget")
-
-        # Inventory widget is authoritative when present
-        if widget in ("product_pdp_inventory", "inventory", "inventory_v2"):
-            inventory = data.get("inventory")
-            try:
-                is_in_stock = int(inventory) > 0
-            except (TypeError, ValueError):
-                is_in_stock = bool(inventory)
-            log.debug("Blinkit: inventory widget value=%s → is_in_stock=%s", inventory, is_in_stock)
-
-        # Primary: snippet with identity.id matching product_id
+        # ── Match by product identity ─────────────────────────────────────────
         identity = data.get("identity", {})
-        if isinstance(identity, dict) and str(identity.get("id")) == product_id:
+        snippet_id = str(identity.get("id")) if isinstance(identity, dict) else None
+        is_target = snippet_id == product_id
+
+        if is_target:
             found_product = True
 
-            # Try rfc_actions_v2 → remove_from_cart for product details
+            # ── 1. Direct inventory / stock fields (most reliable) ────────────
+            # These fields appear directly on the product card snippet.
+            # `inventory` is an integer count (>0 = available).
+            # `is_sold_out` is a boolean.
+            # `product_state` is a string: "available" | "sold_out" | "unavailable"
+            raw_inventory = data.get("inventory")
+            is_sold_out = data.get("is_sold_out")
+            product_state = data.get("product_state")
+
+            if raw_inventory is not None:
+                try:
+                    inv = int(raw_inventory)
+                    is_in_stock = inv > 0
+                    log.debug("Blinkit[%s]: inventory=%d → is_in_stock=%s", product_id, inv, is_in_stock)
+                except (TypeError, ValueError):
+                    pass
+
+            if is_in_stock is None and is_sold_out is not None:
+                is_in_stock = not bool(is_sold_out)
+                log.debug("Blinkit[%s]: is_sold_out=%s → is_in_stock=%s", product_id, is_sold_out, is_in_stock)
+
+            if is_in_stock is None and product_state:
+                is_in_stock = str(product_state).lower() == "available"
+                log.debug("Blinkit[%s]: product_state=%r → is_in_stock=%s", product_id, product_state, is_in_stock)
+
+            # ── 2. Stepper (Add to Cart button state) ────────────────────────
+            # When is_in_stock is still None, check if the stepper is "enabled".
+            # Blinkit disables/removes the stepper for OOS items.
+            if is_in_stock is None:
+                stepper = data.get("stepper_data", {})
+                stepper_state = (
+                    stepper.get("state", {}).get("title", {}).get("text", "") if stepper else ""
+                )
+                if stepper_state:
+                    is_in_stock = stepper_state.lower() == "enabled"
+                    log.debug("Blinkit[%s]: stepper_state=%r → is_in_stock=%s", product_id, stepper_state, is_in_stock)
+
+            # ── 3. Price from normal_price.text ───────────────────────────────
+            normal_price = data.get("normal_price", {})
+            if isinstance(normal_price, dict):
+                p = _parse_price_text(normal_price.get("text"))
+                if p and not price:
+                    price = p
+                    if not mrp:
+                        mrp = p
+
+            # ── 4. Variant text from variant.text ─────────────────────────────
+            variant_data = data.get("variant", {})
+            if isinstance(variant_data, dict) and not raw_quantity:
+                raw_quantity = variant_data.get("text")
+
+            # ── 5. rfc_actions_v2 (remove-from-cart has full product details) ─
             rfc = data.get("rfc_actions_v2", {})
             if isinstance(rfc, dict):
                 for action in rfc.get("default", []):
                     if action and isinstance(action, dict):
                         cart_item = action.get("remove_from_cart", {}).get("cart_item", {})
                         if cart_item:
-                            name = cart_item.get("product_name") or cart_item.get("display_name")
-                            brand = cart_item.get("brand")
-                            image_url = cart_item.get("image_url")
-                            mrp = cart_item.get("mrp") or None
-                            price = cart_item.get("price") or mrp
-                            raw_quantity = cart_item.get("unit") or cart_item.get("quantity")
-                            break
-
-            # Try atc_actions_v2 → add_to_cart
-            atc = data.get("atc_actions_v2", {})
-            if isinstance(atc, dict) and atc.get("default"):
-                for action in atc.get("default", []):
-                    if action and isinstance(action, dict):
-                        cart_item = action.get("add_to_cart", {}).get("cart_item", {})
-                        if cart_item:
-                            has_atc_action = True  # ATC present → proxy for in-stock
                             if not name:
                                 name = cart_item.get("product_name") or cart_item.get("display_name")
                             if not brand:
@@ -153,20 +203,73 @@ def _parse_snippets(snippets: list[dict], product_id: str) -> ProductResult:
                                 image_url = cart_item.get("image_url")
                             if not raw_quantity:
                                 raw_quantity = cart_item.get("unit") or cart_item.get("quantity")
-                            mrp = cart_item.get("mrp") or mrp
-                            price = cart_item.get("price") or price or mrp
+                            ci_mrp = cart_item.get("mrp")
+                            ci_price = cart_item.get("price")
+                            if ci_mrp and not mrp:
+                                mrp = ci_mrp
+                            if ci_price and not price:
+                                price = ci_price or mrp
                             break
 
-            # Also try direct product_data structure
-            if not name:
-                prod_data = data.get("product_data", {})
-                if prod_data:
-                    name = prod_data.get("name") or prod_data.get("product_name")
-                    brand = prod_data.get("brand")
-                    image_url = prod_data.get("image_url")
-                    raw_quantity = raw_quantity or prod_data.get("unit") or prod_data.get("quantity")
+            # ── 6. atc_actions_v2 (add-to-cart, when populated) ───────────────
+            atc = data.get("atc_actions_v2", {})
+            if isinstance(atc, dict):
+                for action in atc.get("default", []):
+                    if action and isinstance(action, dict):
+                        cart_item = action.get("add_to_cart", {}).get("cart_item", {})
+                        if cart_item:
+                            if not name:
+                                name = cart_item.get("product_name") or cart_item.get("display_name")
+                            if not brand:
+                                brand = cart_item.get("brand")
+                            if not image_url:
+                                image_url = cart_item.get("image_url")
+                            if not raw_quantity:
+                                raw_quantity = cart_item.get("unit") or cart_item.get("quantity")
+                            ci_mrp = cart_item.get("mrp")
+                            ci_price = cart_item.get("price")
+                            if ci_mrp and not mrp:
+                                mrp = ci_mrp
+                            if ci_price and not price:
+                                price = ci_price or mrp
+                            break
 
-        # Look for image in item lists even without id match
+        # ── 7. Tracking common_attributes (available on some snippets) ─────────
+        # Even on non-identity snippets, tracking data may provide price/state.
+        tracking = snippet.get("tracking", {})
+        common_attrs = tracking.get("common_attributes", {}) if isinstance(tracking, dict) else {}
+        if isinstance(common_attrs, dict) and str(common_attrs.get("product_id")) == product_id:
+            if not name:
+                # tracking rarely has the name, but try
+                pass
+            if not price:
+                ta_price = common_attrs.get("price")
+                if ta_price:
+                    try:
+                        price = float(ta_price)
+                    except (TypeError, ValueError):
+                        pass
+            if not mrp:
+                ta_mrp = common_attrs.get("mrp")
+                if ta_mrp:
+                    try:
+                        mrp = float(ta_mrp)
+                    except (TypeError, ValueError):
+                        pass
+            # Use tracking state if we still don't know stock status
+            if is_in_stock is None:
+                ta_state = common_attrs.get("state")
+                if ta_state:
+                    is_in_stock = str(ta_state).lower() == "available"
+                    log.debug("Blinkit[%s]: tracking state=%r → is_in_stock=%s", product_id, ta_state, is_in_stock)
+            # Extract name from title snippet if still missing
+            if not name:
+                data_for_title = snippet.get("data", {})
+                title = data_for_title.get("title", {})
+                if isinstance(title, dict):
+                    name = title.get("text") or name
+
+        # ── 8. Image from item lists ──────────────────────────────────────────
         if not image_url:
             for list_key in ("itemList", "horizontal_item_list", "item_list"):
                 item_list = data.get(list_key, [])
@@ -179,44 +282,43 @@ def _parse_snippets(snippets: list[dict], product_id: str) -> ProductResult:
                         )
                     break
 
-    if found_product or name:
-        # Resolve final in-stock status:
-        # If the inventory widget gave an explicit answer, use it.
-        # Otherwise fall back to ATC-action presence (ATC button = can add to cart = in stock).
-        if is_in_stock is not None:
-            final_in_stock = is_in_stock
-        elif has_atc_action:
-            log.debug("Blinkit: no inventory widget, inferring in_stock=True from atc_action presence")
-            final_in_stock = True
-        else:
-            log.debug("Blinkit: no inventory widget and no atc_action → out_of_stock")
-            final_in_stock = False
+    if not found_product and not name:
+        return ProductResult(status="not_carried")
 
-        status = "in_stock" if final_in_stock else "out_of_stock"
-        actual_price = float(price) if price and float(price) > 0 else None
-        actual_mrp = float(mrp) if mrp and float(mrp) > 0 else actual_price
-        
-        variant_label = raw_quantity if raw_quantity else (name or "")
-        nq = parse_quantity(variant_label)
-        
-        return ProductResult(
-            status=status,
-            name=name,
-            brand=brand,
-            image_url=image_url,
-            price=actual_price,
-            mrp=actual_mrp,
-            pack_count=nq.pack_count if nq else None,
-            quantity_per_pack=nq.quantity_per_pack if nq else None,
-            quantity_unit=nq.quantity_unit if nq else None,
-            total_quantity=nq.total_quantity if nq else None,
-            total_quantity_unit=nq.total_quantity_unit if nq else None,
-            price_per_unit=(actual_price) / nq.total_quantity if (actual_price and nq and nq.total_quantity > 0) else None,
-            raw_variant=variant_label,
-            quantity_confidence=nq.confidence if nq else None
+    # ── Final stock resolution ───────────────────────────────────────────────
+    if is_in_stock is None:
+        # No explicit stock signal found — default out_of_stock when product was found
+        # (but log it clearly so we know which signal path failed)
+        log.warning(
+            "Blinkit[%s]: product found but no stock signal detected "
+            "(no inventory/is_sold_out/product_state/stepper). Defaulting to out_of_stock.",
+            product_id,
         )
+        is_in_stock = False
 
-    return ProductResult(status="not_carried")
+    status = "in_stock" if is_in_stock else "out_of_stock"
+    actual_price = float(price) if price and float(price) > 0 else None
+    actual_mrp = float(mrp) if mrp and float(mrp) > 0 else actual_price
+
+    variant_label = raw_quantity if raw_quantity else (name or "")
+    nq = parse_quantity(variant_label)
+
+    return ProductResult(
+        status=status,
+        name=name,
+        brand=brand,
+        image_url=image_url,
+        price=actual_price,
+        mrp=actual_mrp,
+        pack_count=nq.pack_count if nq else None,
+        quantity_per_pack=nq.quantity_per_pack if nq else None,
+        quantity_unit=nq.quantity_unit if nq else None,
+        total_quantity=nq.total_quantity if nq else None,
+        total_quantity_unit=nq.total_quantity_unit if nq else None,
+        price_per_unit=(actual_price) / nq.total_quantity if (actual_price and nq and nq.total_quantity > 0) else None,
+        raw_variant=variant_label,
+        quantity_confidence=nq.confidence if nq else None,
+    )
 
 
 class BlinkitClient(PlatformClient):
@@ -375,11 +477,20 @@ class BlinkitClient(PlatformClient):
 
         result = await self._fetch_product_via_playwright(product_id, lat, lng)
         if result is None:
-            log.warning("Blinkit: Playwright fetch returned None for pvid=%s — returning error (not out_of_stock) to avoid false unavailable signal", product_id)
+            log.warning(
+                "Blinkit: Playwright fetch returned None for pvid=%s — "
+                "returning error (not out_of_stock) to avoid false unavailable signal",
+                product_id,
+            )
             return ProductResult(status="error")
 
         snippets = result.get("response", {}).get("snippets", [])
-        return _parse_snippets(snippets, product_id)
+        parsed = _parse_snippets(snippets, product_id)
+        log.info(
+            "Blinkit[%s] @ (%.4f,%.4f): status=%s name=%r price=%s",
+            product_id, lat or 0.0, lng or 0.0, parsed.status, parsed.name, parsed.price,
+        )
+        return parsed
 
     async def product_at_location(
         self, product_id: str, lat: float, lng: float

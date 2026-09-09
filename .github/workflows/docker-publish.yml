@@ -6,7 +6,7 @@
 #   - Manual dispatch              → builds with the selected tag
 #   - Pull request to `main`       → build-only (no push) for CI validation
 #
-# Images published:
+# Images published (multi-platform: linux/amd64 + linux/arm64):
 #   ghcr.io/harsh-gopal/cartradar-backend:latest   (FastAPI + uvicorn + Playwright)
 #   ghcr.io/harsh-gopal/cartradar-frontend:latest  (React → nginx reverse-proxy)
 
@@ -54,9 +54,20 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # ── Docker Buildx (for multi-platform builds if needed later) ───────────
+      # ── QEMU for ARM64 cross-compilation ─────────────────────────────────
+      # Required so the AMD64 GitHub runner can build linux/arm64 images.
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
+      # ── Docker Buildx (multi-platform builder) ───────────────────────────
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+        with:
+          # Use the docker-container driver to support multi-platform builds
+          driver-opts: |
+            image=moby/buildkit:latest
 
       # ── Authenticate to GHCR ────────────────────────────────────────────────
       - name: Log in to GitHub Container Registry
@@ -95,12 +106,14 @@ jobs:
           echo "frontend_tags=${FRONTEND_TAGS}" >> $GITHUB_OUTPUT
           echo "short_sha=${SHORT_SHA}" >> $GITHUB_OUTPUT
 
-      # ── Build + push backend ─────────────────────────────────────────────────
+      # ── Build + push backend (linux/amd64 + linux/arm64) ─────────────────
       - name: Build and push backend image
         uses: docker/build-push-action@v5
         with:
           context: ./backend
           file: ./backend/Dockerfile
+          # Build for both AMD64 (servers/CI) and ARM64 (Apple Silicon Macs)
+          platforms: linux/amd64,linux/arm64
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.tags.outputs.backend_tags }}
           # Layer caching via GitHub Actions cache
@@ -111,12 +124,14 @@ jobs:
             org.opencontainers.image.description=Cart Radar backend (FastAPI + uvicorn + Playwright)
             org.opencontainers.image.revision=${{ github.sha }}
 
-      # ── Build + push frontend ────────────────────────────────────────────────
+      # ── Build + push frontend (linux/amd64 + linux/arm64) ────────────────
       - name: Build and push frontend image
         uses: docker/build-push-action@v5
         with:
           context: ./frontend
           file: ./frontend/Dockerfile
+          # Build for both AMD64 (servers/CI) and ARM64 (Apple Silicon Macs)
+          platforms: linux/amd64,linux/arm64
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.tags.outputs.frontend_tags }}
           cache-from: type=gha,scope=frontend
@@ -131,6 +146,8 @@ jobs:
         if: github.event_name != 'pull_request'
         run: |
           echo "## Docker Images Published" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Platforms:** linux/amd64, linux/arm64 (Apple Silicon)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Image | Tags |" >> $GITHUB_STEP_SUMMARY
           echo "|---|---|" >> $GITHUB_STEP_SUMMARY

@@ -6,7 +6,7 @@ from starlette.requests import Request
 
 from app import main
 from app.links import extract_product_id
-from app.platforms.blinkit import BlinkitClient
+from app.platforms.blinkit import BlinkitClient, _parse_snippets
 
 
 class _FailIfCalled:
@@ -139,3 +139,86 @@ def test_blinkit_gracefully_falls_back_when_blocked(monkeypatch) -> None:
         await client.aclose()
 
     asyncio.run(run_checks())
+
+
+def test_blinkit_parse_snippets_in_stock() -> None:
+    """_parse_snippets must return in_stock when the product snippet has
+    inventory=5, is_sold_out=False, product_state='available'.
+    These fields live directly on the identity-matched snippet — not on a
+    separate 'widget'-typed snippet as the old code expected.
+    """
+    snippets = [
+        {
+            "data": {
+                "identity": {"id": "10532"},
+                "variant": {"text": "250 g"},
+                "normal_price": {"text": "₹160"},
+                "inventory": 5,
+                "is_sold_out": False,
+                "product_state": "available",
+                "stepper_data": {"state": {"title": {"text": "enabled"}}},
+                "rfc_actions_v2": {
+                    "default": [
+                        {
+                            "remove_from_cart": {
+                                "cart_item": {
+                                    "product_name": "Tata Tea Gold",
+                                    "brand": "Tata Tea Gold",
+                                    "unit": "250 g",
+                                    "price": 160,
+                                    "mrp": 160,
+                                }
+                            },
+                            "type": "remove_from_cart",
+                        }
+                    ]
+                },
+                "atc_actions_v2": {"default": [None]},  # null ATC is typical for in-cart items
+            }
+        }
+    ]
+    result = _parse_snippets(snippets, "10532")
+    assert result.status == "in_stock", f"Expected in_stock, got {result.status}"
+    assert result.name == "Tata Tea Gold"
+    assert result.price == 160.0
+    assert result.raw_variant == "250 g"
+
+
+def test_blinkit_parse_snippets_out_of_stock() -> None:
+    """_parse_snippets must return out_of_stock when is_sold_out=True."""
+    snippets = [
+        {
+            "data": {
+                "identity": {"id": "99999"},
+                "inventory": 0,
+                "is_sold_out": True,
+                "product_state": "sold_out",
+                "rfc_actions_v2": {
+                    "default": [
+                        {
+                            "remove_from_cart": {
+                                "cart_item": {
+                                    "product_name": "Some Product OOS",
+                                    "price": 50,
+                                    "mrp": 50,
+                                    "unit": "500 ml",
+                                }
+                            }
+                        }
+                    ]
+                },
+            }
+        }
+    ]
+    result = _parse_snippets(snippets, "99999")
+    assert result.status == "out_of_stock", f"Expected out_of_stock, got {result.status}"
+
+
+def test_blinkit_parse_snippets_not_carried() -> None:
+    """_parse_snippets must return not_carried when no snippet matches the product ID."""
+    snippets = [
+        {"data": {"identity": {"id": "other"}, "inventory": 5}}
+    ]
+    result = _parse_snippets(snippets, "10532")
+    assert result.status == "not_carried", f"Expected not_carried, got {result.status}"
+
