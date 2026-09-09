@@ -102,7 +102,58 @@ Cart Radar is a web app that lets you paste any product link from a supported In
 
 ---
 
-## 🚀 Quick Start — Non-Technical Users
+## 🚀 Quick Start - Easy Setup Guide
+
+### 🤖 Need Help Setting It Up?
+
+If you prefer, copy the prompt below into ChatGPT, Claude, Gemini, or another capable LLM and it can guide you through the setup:
+
+```text
+I want to run the Cart Radar app locally on my computer.
+
+GitHub repository:
+https://github.com/Harsh-Gopal/CartRadar
+
+Please help me set it up step by step.
+
+1. First, ask me which operating system I am using:
+   - macOS
+   - Windows
+   - Linux
+
+2. Check the current Cart Radar GitHub repository and its README/documentation before giving setup instructions, so your instructions match the latest version of the project.
+
+3. Guide me to either:
+   - clone the repository using Git, OR
+   - download the repository as a ZIP and extract it.
+
+4. Check whether Docker Desktop is installed and running.
+   If it is not installed, guide me to install Docker Desktop from:
+   https://www.docker.com/products/docker-desktop/
+
+5. Based on my operating system, tell me exactly which Cart Radar installation launcher to run:
+   - macOS → Cart Radar Install.command
+   - Windows → Cart Radar Install.bat
+   - Linux → Cart Radar Install.sh
+
+6. After installation, tell me which everyday launcher to use:
+   - macOS → Cart Radar.command
+   - Windows → Cart Radar.bat
+   - Linux → Cart Radar.sh or Cart Radar.desktop
+
+7. Tell me that Cart Radar will be available at:
+   http://localhost:3000
+
+8. If I encounter an error, first check the latest Cart Radar README and documentation and explain the error in simple steps.
+   Use the repository documentation to determine the correct troubleshooting procedure.
+
+9. Do not tell me to install Node.js, Python, pnpm, uv, or other developer tools unless the current Cart Radar documentation specifically requires them for the setup path I am using.
+
+10. Do not ask me to manually edit source code for normal installation or troubleshooting.
+    Prefer the official Cart Radar launchers and documented Docker workflow.
+
+Always base your instructions on the current GitHub repository rather than older instructions or assumptions.
+```
 
 The easiest and recommended way to run Cart Radar is using the pre-built Docker images via our one-click launchers. You do NOT need Python, Node.js, or any other developer tools.
 
@@ -215,34 +266,7 @@ Set these environment variables (or place them in a `.env` file) to configure th
 
 For more detailed help, see [`docs/DOCKER_SETUP.md`](docs/DOCKER_SETUP.md) if it exists.
 
----
 
-## 🤖 Run Cart Radar With an LLM
-
-If you are a non-technical user and need help setting this up, copy and paste the prompt below into ChatGPT, Claude, or Gemini:
-
-```text
-I want to run the Cart Radar app locally on my computer.
-
-GitHub repository: https://github.com/Harsh-Gopal/CartRadar
-
-Please:
-1. First, ask me what operating system I'm using (macOS / Windows / Linux).
-2. Check the current repository documentation to determine the recommended setup method.
-3. Guide me step by step to download the repository as a ZIP and extract it.
-4. Guide me to install Docker Desktop (https://www.docker.com/products/docker-desktop/) if I don't have it.
-5. Tell me to run the correct installation launcher for my OS:
-   - macOS → "Cart Radar Install.command"
-   - Windows → "Cart Radar Install.bat"
-   - Linux → "Cart Radar Install.sh"
-6. Tell me to run the correct everyday launcher:
-   - macOS → "Cart Radar.command"
-   - Windows → "Cart Radar.bat"
-   - Linux → "Cart Radar.sh" or "Cart Radar.desktop"
-7. Tell me the application will be available at http://localhost:3000
-8. If I paste an error, check the README and docs/DOCKER_SETUP.md, explain the issue simply, and give me the exact next step.
-9. Do not tell me to install Node.js, Python, or edit source code unless the documentation specifically requires it for the Docker workflow.
-```
 
 ---
 
