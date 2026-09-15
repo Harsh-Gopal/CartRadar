@@ -78,7 +78,7 @@ const createUserIcon = () => new L.DivIcon({
   popupAnchor: [0, -38],
 });
 
-function StoreMarker({ r, selectedId, searchPincode, onSelect }: { r: StoreResult; selectedId: string | null; searchPincode?: string | null; onSelect: (r: StoreResult) => void }) {
+function StoreMarker({ r, selectedId, onSelect }: { r: StoreResult; selectedId: string | null; onSelect: (r: StoreResult) => void }) {
   const storePincode = usePincode(r.store.lat, r.store.lng, r.store.city)
   
   return (
@@ -97,9 +97,9 @@ function StoreMarker({ r, selectedId, searchPincode, onSelect }: { r: StoreResul
       <Popup className="rounded-xl overflow-hidden shadow-sm">
         <div className="flex flex-col gap-1 p-1">
           <span className="font-semibold text-sm">{r.store.name ?? "Store"} {r.store.city ? `(${r.store.city})` : ""}</span>
-          {(storePincode || searchPincode) && (
+          {storePincode && (
             <span className="text-xs font-medium text-primary/70">
-              Pincode: {storePincode || searchPincode}
+              Pincode: {storePincode}
             </span>
           )}
           <div className="flex items-center justify-between gap-4 mt-1">
@@ -124,12 +124,12 @@ interface ResultsMapProps {
   homeStatus: StoreResult["status"] | null
   homePrice: number | null
   selectedId: string | null
-  searchPincode?: string | null
+  searchPincode?: string | null  // kept in interface for API compatibility; not forwarded to store markers
   onSelect: (result: StoreResult) => void
   className?: string
 }
 
-export function ResultsMap({ lat, lng, radiusKm, results, homeStatus, homePrice, selectedId, searchPincode, onSelect, className }: ResultsMapProps) {
+export function ResultsMap({ lat, lng, radiusKm, results, homeStatus, homePrice, selectedId, onSelect, className }: ResultsMapProps) {
   const { resolvedTheme } = useTheme()
   const isDark = (resolvedTheme ?? "dark") === "dark"
   const [fitKey, setFitKey] = useState(0)
@@ -232,7 +232,6 @@ export function ResultsMap({ lat, lng, radiusKm, results, homeStatus, homePrice,
             key={r.store.id}
             r={r}
             selectedId={selectedId}
-            searchPincode={searchPincode}
             onSelect={onSelect}
           />
         );

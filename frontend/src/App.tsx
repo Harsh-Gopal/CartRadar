@@ -525,13 +525,35 @@ export function App() {
   }, [searchKey, state.phase])
 
   const sortedResults = useMemo(
-    () =>
-      [...state.results].sort(
-        (a, b) =>
-          (a.status === "in_stock" ? 0 : 1) -
-            (b.status === "in_stock" ? 0 : 1) || a.distance_km - b.distance_km
-      ),
-    [state.results]
+    () => {
+      const targetPincode = coords?.label?.match(/\b\d{6}\b/)?.[0] || null;
+      
+      return [...state.results].sort((a, b) => {
+        // 1. User's pincode
+        if (targetPincode) {
+           const aPin = a.store.city?.match(/\b\d{6}\b/)?.[0];
+           const bPin = b.store.city?.match(/\b\d{6}\b/)?.[0];
+           const aMatches = aPin === targetPincode;
+           const bMatches = bPin === targetPincode;
+           if (aMatches && !bMatches) return -1;
+           if (!aMatches && bMatches) return 1;
+        }
+
+        // 2. Availability
+        const aStock = a.status === "in_stock" ? 0 : 1;
+        const bStock = b.status === "in_stock" ? 0 : 1;
+        if (aStock !== bStock) return aStock - bStock;
+
+        // 3. Price ascending
+        const aPrice = a.price ?? Infinity;
+        const bPrice = b.price ?? Infinity;
+        if (aPrice !== bPrice) return aPrice - bPrice;
+
+        // 4. Stable existing order (distance)
+        return a.distance_km - b.distance_km;
+      });
+    },
+    [state.results, coords]
   )
 
   const inStock = useMemo(
@@ -706,7 +728,7 @@ export function App() {
               <div className={`flex flex-col gap-6 w-full ${resolved || linkText ? 'lg:w-[480px] xl:w-[560px] shrink-0' : 'w-full'}`}>
                 
                 {/* Step 1 — product */}
-            <Card className="animate-in fade-in-0 slide-in-from-bottom-1">
+            <Card className="sticky top-[72px] z-30 shadow-sm animate-in fade-in-0 slide-in-from-bottom-1">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-base">
                   <StepBadge n={1} done={!!resolved} />

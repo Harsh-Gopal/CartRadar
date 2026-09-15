@@ -83,22 +83,28 @@ function StoreListItem({
   r,
   selectedId,
   cheapestId,
-  searchPincode,
   onSelect,
 }: {
   r: StoreResult
   selectedId: string | null
   cheapestId: string | null
-  searchPincode?: string | null
   onSelect: (r: StoreResult) => void
 }) {
+  // usePincode reverse-geocodes the WAREHOUSE's physical coordinates.
+  // This is the store's own pincode — NOT the user's search pincode.
   const storePincode = usePincode(r.store.lat, r.store.lng, r.store.city)
+
   // Remove pincode already embedded in city string to avoid "City, 110092 · 110092" duplicates
   const cityDisplay = r.store.city
     ? r.store.city.replace(/[,\s]*(\d{6})[,\s]*/g, "").trim().replace(/[,·]+$/, "").trim()
     : null
-  // Only show pincode badge if we actually have one
-  const displayPincode = storePincode || searchPincode || null
+
+  // Only show the store's OWN physical pincode.
+  // IMPORTANT: Do NOT fall back to searchPincode here.
+  // The user's search pincode is a completely separate concept from the store's
+  // physical warehouse pincode. Conflating them would be misleading — e.g. showing
+  // "800014" next to a store that actually serves pincode 801505.
+  const displayPincode = storePincode || null
 
   return (
     <Item asChild size="sm">
@@ -187,21 +193,85 @@ export function ResultsList({
   searchPincode,
   onSelect,
 }: ResultsListProps) {
+  // Group results into "user's pincode" vs "other locations".
+  //
+  // Identity rules:
+  //   - "user's pincode" = store.city contains the 6-digit searchPincode.
+  //     This works reliably when the backend has populated store.city via Nominatim.
+  //   - When store.city is absent (e.g. Instamart always returns city=null from backend),
+  //     we cannot group — all results go into the flat list. The "YOUR PINCODE" /
+  //     "OTHER LOCATIONS" UI section headers are only shown when we can actually
+  //     distinguish the two groups from the server-provided data.
+  //
+  // NOTE: We deliberately do NOT use the user's searchPincode as a fallback when
+  // store.city is missing. Doing so would incorrectly imply that every uncategorised
+  // store is at the user's pincode, which is the exact identity mismatch we are fixing.
+  const userPincodeResults: StoreResult[] = []
+  const otherResults: StoreResult[] = []
+
+  for (const r of results) {
+    // Extract a 6-digit pincode from the store's backend-provided city string.
+    // This is the WAREHOUSE's serviceable/address pincode, populated by the backend
+    // from Nominatim reverse-geocoding of the warehouse coordinates.
+    const cityPin = r.store.city?.match(/\b\d{6}\b/)?.[0]
+    if (searchPincode && cityPin && cityPin === searchPincode) {
+      userPincodeResults.push(r)
+    } else {
+      otherResults.push(r)
+    }
+  }
+
+  // Only show section headers when we can genuinely distinguish both groups.
+  const showHeaders = userPincodeResults.length > 0 && otherResults.length > 0
+
   return (
-    <ItemGroup>
-      {results.map((r, i) => (
-        <Fragment key={r.store.id}>
-          {i > 0 && <ItemSeparator />}
-          <StoreListItem
-            r={r}
-            selectedId={selectedId}
-            cheapestId={cheapestId}
-            searchPincode={searchPincode}
-            onSelect={onSelect}
-          />
-        </Fragment>
-      ))}
-    </ItemGroup>
+    <div className="flex flex-col gap-4">
+      {userPincodeResults.length > 0 && (
+        <div className="flex flex-col gap-2">
+          {showHeaders && (
+            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-1">
+              Your Pincode
+            </h3>
+          )}
+          <ItemGroup>
+            {userPincodeResults.map((r, i) => (
+              <Fragment key={r.store.id}>
+                {i > 0 && <ItemSeparator />}
+                <StoreListItem
+                  r={r}
+                  selectedId={selectedId}
+                  cheapestId={cheapestId}
+                  onSelect={onSelect}
+                />
+              </Fragment>
+            ))}
+          </ItemGroup>
+        </div>
+      )}
+
+      {otherResults.length > 0 && (
+        <div className="flex flex-col gap-2">
+          {showHeaders && (
+            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-1 mt-2">
+              Other Locations
+            </h3>
+          )}
+          <ItemGroup>
+            {otherResults.map((r, i) => (
+              <Fragment key={r.store.id}>
+                {i > 0 && <ItemSeparator />}
+                <StoreListItem
+                  r={r}
+                  selectedId={selectedId}
+                  cheapestId={cheapestId}
+                  onSelect={onSelect}
+                />
+              </Fragment>
+            ))}
+          </ItemGroup>
+        </div>
+      )}
+    </div>
   )
 }
 
