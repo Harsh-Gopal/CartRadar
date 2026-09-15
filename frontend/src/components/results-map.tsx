@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils"
 import { useTheme } from "@/components/theme-provider"
 import { STATUS_LABEL, getPlatformFromId } from "@/components/results-list"
 import type { StoreResult } from "@/lib/api"
-import { usePincode } from "@/lib/use-pincode"
+
 
 // OpenStreetMap tiles — free, no API key, globally available.
 // Dark mode uses a CSS filter (invert + hue-rotate) on the tile pane.
@@ -79,7 +79,7 @@ const createUserIcon = () => new L.DivIcon({
 });
 
 function StoreMarker({ r, selectedId, onSelect }: { r: StoreResult; selectedId: string | null; onSelect: (r: StoreResult) => void }) {
-  const storePincode = usePincode(r.store.lat, r.store.lng, r.store.city)
+  const storePincode = r.store.city?.match(/\b\d{6}\b/)?.[0] || null
   
   return (
     <CircleMarker

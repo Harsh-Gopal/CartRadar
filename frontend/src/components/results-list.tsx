@@ -14,7 +14,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
 import type { StoreResult } from "@/lib/api"
 import { PlatformBadge } from "./platform-badge"
-import { usePincode } from "@/lib/use-pincode"
+
 
 export const STATUS_LABEL: Record<StoreResult["status"], string> = {
   in_stock: "In stock",
@@ -90,9 +90,9 @@ function StoreListItem({
   cheapestId: string | null
   onSelect: (r: StoreResult) => void
 }) {
-  // usePincode reverse-geocodes the WAREHOUSE's physical coordinates.
-  // This is the store's own pincode — NOT the user's search pincode.
-  const storePincode = usePincode(r.store.lat, r.store.lng, r.store.city)
+  // Extract pincode directly from the city string provided by the backend.
+  // Do NOT derive it from coordinates via Nominatim.
+  const storePincode = r.store.city?.match(/\b\d{6}\b/)?.[0] || null
 
   // Remove pincode already embedded in city string to avoid "City, 110092 · 110092" duplicates
   const cityDisplay = r.store.city
