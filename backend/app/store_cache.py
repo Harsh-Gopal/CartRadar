@@ -46,6 +46,23 @@ CREATE TABLE IF NOT EXISTS address_cache (
     resolved_at TEXT NOT NULL,
     PRIMARY KEY (lat, lng)
 );
+CREATE TABLE IF NOT EXISTS search_sweeps (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    lat REAL NOT NULL,
+    lng REAL NOT NULL,
+    radius_km REAL NOT NULL,
+    platform TEXT NOT NULL,
+    product_id TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_search_sweeps ON search_sweeps(lat, lng, radius_km, platform, product_id);
+CREATE TABLE IF NOT EXISTS search_sweep_stores (
+    sweep_id INTEGER NOT NULL,
+    store_id TEXT NOT NULL,
+    platform TEXT NOT NULL,
+    FOREIGN KEY(sweep_id) REFERENCES search_sweeps(id)
+);
+CREATE INDEX IF NOT EXISTS idx_search_sweep_stores ON search_sweep_stores(sweep_id);
 """
 
 
@@ -98,16 +115,28 @@ class StoreCache:
     def stores_within(self, lat: float, lng: float, radius_km: float, platform: str = "zepto") -> list[Store]:
         dlat = radius_km / KM_PER_DEG_LAT
         dlng = radius_km / (KM_PER_DEG_LAT * max(0.1, math.cos(math.radians(lat))))
-        rows = self._db.execute(
-            "SELECT id, name, city, lat, lng, platform FROM stores "
-            "WHERE platform = ? AND lat BETWEEN ? AND ? AND lng BETWEEN ? AND ?",
+        
+        # 1. Find all stores discovered by probe points within this exact radius
+        probes = self._db.execute(
+            "SELECT lat, lng, store_id FROM probed_points "
+            "WHERE platform = ? AND lat BETWEEN ? AND ? AND lng BETWEEN ? AND ? AND store_id IS NOT NULL",
             (platform, lat - dlat, lat + dlat, lng - dlng, lng + dlng),
         ).fetchall()
-        return [
-            Store(*r)
-            for r in rows
-            if haversine_km(lat, lng, r[3], r[4]) <= radius_km
-        ]
+        
+        valid_store_ids = {
+            p[2] for p in probes
+            if haversine_km(lat, lng, p[0], p[1]) <= radius_km
+        }
+        
+        if not valid_store_ids:
+            return []
+            
+        # 2. Fetch the actual Store objects
+        placeholders = ",".join("?" * len(valid_store_ids))
+        query = f"SELECT id, name, city, lat, lng, platform FROM stores WHERE platform = ? AND id IN ({placeholders})"
+        
+        rows = self._db.execute(query, [platform] + list(valid_store_ids)).fetchall()
+        return [Store(*r) for r in rows]
 
     def has_fresh_probe_near(self, lat: float, lng: float, within_km: float, platform: str = "zepto") -> bool:
         cutoff_ok = datetime.now(timezone.utc) - timedelta(days=SERVICEABLE_PROBE_TTL_DAYS)

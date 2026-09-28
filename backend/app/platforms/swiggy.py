@@ -354,7 +354,7 @@ class SwiggyClient(PlatformClient):
         Returns a StoreResolution with the store_id embedded in the page's Redux state.
         If no product_id given, fetches with a known-stable placeholder item.
         """
-        pid = product_id or "F9UK3KLPCI"  # generic item used only for store discovery
+        pid = "F9UK3KLPCI"  # always use generic item for store discovery to avoid store omission on out-of-catalog items
         async with self._semaphore:
             html = await _fetch_page(pid, lat, lng)
 

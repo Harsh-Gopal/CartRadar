@@ -27,6 +27,7 @@ async def run_search(
     radius_km: float,
     force: bool = False,
     probe_budget: TokenBucket | None = None,
+    geocoder = None,
 ) -> AsyncIterator[dict]:
     """Run a stock check search using any PlatformClient.
 
@@ -102,6 +103,18 @@ async def run_search(
                     import time
                     res.store_id = f"fm_store_{int(time.time())}_{round(plat, 3)}_{round(plng, 3)}"
 
+        # Reverse geocode the store if it's a real store and city is missing
+        if res.serviceable and res.store_id and not res.store_id.startswith("synthetic_") and not res.store_id.startswith("fm_store_"):
+            if not res.city and geocoder:
+                cached_addr = cache.get_address(plat, plng)
+                if cached_addr:
+                    res.city = cached_addr.formatted_address
+                else:
+                    addr = await geocoder.reverse_geocode(plat, plng)
+                    if addr:
+                        res.city = addr.formatted_address
+                        cache.save_address(plat, plng, addr)
+        
         store = cache.record_probe(plat, plng, res.store_id, res.store_name, res.city, platform)
         if store:
             start_check(store)
@@ -148,6 +161,18 @@ async def run_search(
                     home.store_id = f"fm_store_{int(time.time())}_{round(lat, 3)}_{round(lng, 3)}"
 
             checked.add(home.store_id)
+            # Reverse geocode the home store if it's a real store and city is missing
+            if home.serviceable and home.store_id and not home.store_id.startswith("synthetic_") and not home.store_id.startswith("fm_store_"):
+                if not home.city and geocoder:
+                    cached_addr = cache.get_address(lat, lng)
+                    if cached_addr:
+                        home.city = cached_addr.formatted_address
+                    else:
+                        addr = await geocoder.reverse_geocode(lat, lng)
+                        if addr:
+                            home.city = addr.formatted_address
+                            cache.save_address(lat, lng, addr)
+                            
             home_store = cache.record_probe(lat, lng, home.store_id, home.store_name, home.city, platform)
             home_product = await client.product_at_store(product_id, home.store_id, lat=lat, lng=lng)
             if home.secondary_store_id and (
