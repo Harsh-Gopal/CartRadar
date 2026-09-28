@@ -10,7 +10,7 @@ import { STATUS_LABEL, getPlatformFromId } from "@/components/results-list"
 import type { StoreResult } from "@/lib/api"
 
 
-import { mapConfig } from "@/config/mapConfig"
+import { mapConfig, FALLBACK_CONFIG } from "@/config/mapConfig"
 
 const PLATFORM_COLORS: Record<string, string> = {
   zepto: "#8B5CF6",
@@ -131,6 +131,7 @@ export function ResultsMap({ lat, lng, radiusKm, results, homeStatus, homePrice,
   const [fitKey, setFitKey] = useState(0)
   const [userIcon] = useState(() => createUserIcon())
   const [mapError, setMapError] = useState(false)
+  const [activeConfig, setActiveConfig] = useState(mapConfig)
 
   const [mapMode, setMapMode] = useState<"simple" | "detailed">(() => {
     try {
@@ -203,15 +204,21 @@ export function ResultsMap({ lat, lng, radiusKm, results, homeStatus, homePrice,
         touchZoom={true}
         doubleClickZoom={true}
         dragging={true}
-        minZoom={mapConfig.minZoom}
-        maxZoom={mapConfig.maxZoom}
+        minZoom={activeConfig.minZoom}
+        maxZoom={activeConfig.maxZoom}
       >
         <TileLayer
-        key={resolvedTheme}
-        attribution={mapConfig.attribution}
-        url={mapConfig.tileUrl}
+        key={`${resolvedTheme}-${activeConfig.provider}`}
+        attribution={activeConfig.attribution}
+        url={activeConfig.tileUrl}
         eventHandlers={{
-          tileerror: () => setMapError(true)
+          tileerror: () => {
+            if (activeConfig.tileUrl !== FALLBACK_CONFIG.tileUrl) {
+              setActiveConfig(FALLBACK_CONFIG)
+            } else {
+              setMapError(true)
+            }
+          }
         }}
         errorTileUrl="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
       />
