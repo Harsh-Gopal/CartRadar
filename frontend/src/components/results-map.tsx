@@ -10,11 +10,7 @@ import { STATUS_LABEL, getPlatformFromId } from "@/components/results-list"
 import type { StoreResult } from "@/lib/api"
 
 
-// OpenStreetMap tiles — free, no API key, globally available.
-// Dark mode uses a CSS filter (invert + hue-rotate) on the tile pane.
-const TILE_URL = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-const TILE_ATTRIBUTION =
-  '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+import { mapConfig } from "@/config/mapConfig"
 
 const PLATFORM_COLORS: Record<string, string> = {
   zepto: "#8B5CF6",
@@ -134,6 +130,7 @@ export function ResultsMap({ lat, lng, radiusKm, results, homeStatus, homePrice,
   const isDark = (resolvedTheme ?? "dark") === "dark"
   const [fitKey, setFitKey] = useState(0)
   const [userIcon] = useState(() => createUserIcon())
+  const [mapError, setMapError] = useState(false)
 
   const [mapMode, setMapMode] = useState<"simple" | "detailed">(() => {
     try {
@@ -162,6 +159,18 @@ export function ResultsMap({ lat, lng, radiusKm, results, homeStatus, homePrice,
   return (
     <div className={cn("relative z-0 w-full", className || "h-72")}>
       <style>{mapFilter}</style>
+      
+      {mapError && (
+        <div className="absolute inset-0 z-[2000] flex flex-col items-center justify-center bg-background/80 backdrop-blur-sm p-4 text-center">
+          <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-3">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          </div>
+          <h3 className="font-semibold text-foreground">Map tiles temporarily unavailable</h3>
+          <p className="text-sm text-muted-foreground mt-1 max-w-[250px]">
+            The map could not be loaded, but you can still view all store results in the list below.
+          </p>
+        </div>
+      )}
       
       <div className="absolute bottom-6 md:bottom-8 right-2 md:right-4 z-[1000]">
         <button
@@ -194,11 +203,17 @@ export function ResultsMap({ lat, lng, radiusKm, results, homeStatus, homePrice,
         touchZoom={true}
         doubleClickZoom={true}
         dragging={true}
+        minZoom={mapConfig.minZoom}
+        maxZoom={mapConfig.maxZoom}
       >
         <TileLayer
         key={resolvedTheme}
-        attribution={TILE_ATTRIBUTION}
-        url={TILE_URL}
+        attribution={mapConfig.attribution}
+        url={mapConfig.tileUrl}
+        eventHandlers={{
+          tileerror: () => setMapError(true)
+        }}
+        errorTileUrl="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
       />
       <MapResizer />
       <FitToRadius lat={lat} lng={lng} radiusKm={radiusKm} fitKey={fitKey} />

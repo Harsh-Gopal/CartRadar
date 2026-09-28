@@ -33,6 +33,9 @@ from .ratelimit import ConcurrencyGate, RateLimiter, TokenBucket
 from .search import run_search
 from .store_cache import StoreCache
 from .geocoder import NominatimProvider
+from .watches.db import WatchDB
+from .watches.router import router as watches_router
+from .watches import scheduler as watches_scheduler
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
 log = logging.getLogger("main")
@@ -84,6 +87,9 @@ async def lifespan(app: FastAPI):
     app.state.probe_budget = TokenBucket(
         config.PROBE_BURST, config.PROBES_PER_DAY / 86_400
     )
+    # Worth-It: initialize watch database and start scheduler
+    app.state.watch_db = WatchDB(config.DATABASE_PATH)
+    watches_scheduler.init_scheduler(app.state.watch_db, app.state.clients)
     # NOTE: Do NOT pre-warm Playwright here — Chromium uses ~250MB which causes
     # OOM on Render free tier (512MB total). Blinkit browser launches lazily on first use.
     yield
@@ -96,6 +102,7 @@ async def lifespan(app: FastAPI):
             await blinkit_close()
         except Exception:
             pass
+    watches_scheduler.stop_scheduler()
     app.state.cache.close()
     if hasattr(app.state, "geocoder") and hasattr(app.state.geocoder, "close"):
         await app.state.geocoder.close()
@@ -103,6 +110,9 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="cart-radar", lifespan=lifespan)
+
+# Worth-It: watches + Telegram endpoints
+app.include_router(watches_router, prefix="/api", tags=["watches"])
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173", "http://127.0.0.1:5173", "*"],

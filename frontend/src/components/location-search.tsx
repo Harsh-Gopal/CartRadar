@@ -17,11 +17,12 @@ import { placeDetails, suggestPlaces, type GeocodeResponse, type PlaceSuggestion
 interface LocationSearchProps {
   coords: GeocodeResponse | null
   onCoords: (coords: GeocodeResponse | null) => void
+  placeholder?: string
 }
 
 const STORAGE_KEY = "cartRadar_lastLocation"
 
-export function LocationSearch({ coords, onCoords }: LocationSearchProps) {
+export function LocationSearch({ coords, onCoords, placeholder }: LocationSearchProps) {
   const [query, setQuery] = useState(coords?.label ?? "")
   const [suggestions, setSuggestions] = useState<PlaceSuggestion[]>([])
   const [open, setOpen] = useState(false)
@@ -164,7 +165,7 @@ export function LocationSearch({ coords, onCoords }: LocationSearchProps) {
           </InputGroupAddon>
           <InputGroupInput
             id="loc"
-            placeholder="Search area, locality or pincode…"
+            placeholder={placeholder || "Search area, locality or pincode…"}
             value={query}
             aria-invalid={error ? true : undefined}
             autoComplete="off"
