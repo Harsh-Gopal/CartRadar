@@ -474,6 +474,7 @@ async def search(
             async for event in run_search(
                 client, state.cache, pvid, lat, lng, radius_km, force,
                 probe_budget=None if (config.DEV_MODE or _local_requests_are_unmetered(request)) else state.probe_budget,
+                geocoder=state.geocoder
             ):
                 yield f"data: {json.dumps(event)}\n\n"
         finally:
