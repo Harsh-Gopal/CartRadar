@@ -90,21 +90,17 @@ function StoreListItem({
   cheapestId: string | null
   onSelect: (r: StoreResult) => void
 }) {
-  // Extract pincode directly from the city string provided by the backend.
-  // Do NOT derive it from coordinates via Nominatim.
-  const storePincode = r.store.city?.match(/\b\d{6}\b/)?.[0] || null
+  // PINCODE CONTRACT: Store pincode is a first-class structured field.
+  // Keep it in the API -> frontend Store model -> result-card flow.
+  // Main store cards must display pincode when available.
+  // Do NOT replace this with regex extraction from `city`.
+  const displayPincode = r.store.pincode || null
 
-  // Remove pincode already embedded in city string to avoid "City, 110092 · 110092" duplicates
+  // Clean the city string for graceful fallback (removes random trailing commas).
+  // This is only used if displayPincode is null.
   const cityDisplay = r.store.city
     ? r.store.city.replace(/[,\s]*(\d{6})[,\s]*/g, "").trim().replace(/[,·]+$/, "").trim()
     : null
-
-  // Only show the store's OWN physical pincode.
-  // IMPORTANT: Do NOT fall back to searchPincode here.
-  // The user's search pincode is a completely separate concept from the store's
-  // physical warehouse pincode. Conflating them would be misleading — e.g. showing
-  // "800014" next to a store that actually serves pincode 801505.
-  const displayPincode = storePincode || null
 
   return (
     <Item asChild size="sm">
@@ -132,15 +128,16 @@ function StoreListItem({
             )}
           </ItemTitle>
           <ItemDescription>
-            {cityDisplay ? `${cityDisplay} · ` : ""}
             {displayPincode ? (
               <span className="text-primary/70 font-medium">
-                {displayPincode} ·{" "}
+                {displayPincode}{r.distance_km != null ? " · " : ""}
               </span>
+            ) : cityDisplay ? (
+              `${cityDisplay} · `
             ) : (
               ""
             )}
-            {r.distance_km === 0 ? "at your location" : `${r.distance_km} km away`}
+            {r.distance_km === 0 ? "at your location" : r.distance_km != null ? `${r.distance_km} km away` : ""}
           </ItemDescription>
         </ItemContent>
         <ItemActions className="flex-col items-end gap-1 shrink-0">
@@ -211,9 +208,8 @@ export function ResultsList({
 
   for (const r of results) {
     // Extract a 6-digit pincode from the store's backend-provided city string.
-    // This is the WAREHOUSE's serviceable/address pincode, populated by the backend
-    // from Nominatim reverse-geocoding of the warehouse coordinates.
-    const cityPin = r.store.city?.match(/\b\d{6}\b/)?.[0]
+    // This is the WAREHOUSE's serviceable/address pincode, populated by the backend.
+    const cityPin = r.store.pincode || r.store.city?.match(/\b\d{6}\b/)?.[0]
     if (searchPincode && cityPin && cityPin === searchPincode) {
       userPincodeResults.push(r)
     } else {

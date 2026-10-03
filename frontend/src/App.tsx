@@ -1114,7 +1114,7 @@ export function App() {
             {showResults && (
               <>
                 <div className="flex flex-col gap-2 mt-4 pb-24">
-                  <div className="flex items-center justify-between">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <p className="text-sm font-medium">
                       {sortedResults.length > 0 ? (
                         <>
@@ -1128,16 +1128,29 @@ export function App() {
                       )}
                     </p>
                     {sortedResults.length > 0 && (
-                      <ToggleGroup
-                        type="single"
-                        variant="outline"
-                        size="sm"
-                        value={onlyInStock ? "in" : "all"}
-                        onValueChange={(v: string) => v && setOnlyInStock(v === "in")}
-                      >
-                        <ToggleGroupItem value="all">All</ToggleGroupItem>
-                        <ToggleGroupItem value="in">In stock</ToggleGroupItem>
-                      </ToggleGroup>
+                      <div className="flex items-center gap-2">
+                        <ToggleGroup
+                          type="single"
+                          variant="outline"
+                          size="sm"
+                          value={view}
+                          onValueChange={(v: "list" | "map") => v && setView(v)}
+                          className="lg:hidden"
+                        >
+                          <ToggleGroupItem value="list" className="px-3">List</ToggleGroupItem>
+                          <ToggleGroupItem value="map" className="px-3">Map</ToggleGroupItem>
+                        </ToggleGroup>
+                        <ToggleGroup
+                          type="single"
+                          variant="outline"
+                          size="sm"
+                          value={onlyInStock ? "in" : "all"}
+                          onValueChange={(v: string) => v && setOnlyInStock(v === "in")}
+                        >
+                          <ToggleGroupItem value="all">All</ToggleGroupItem>
+                          <ToggleGroupItem value="in">In stock</ToggleGroupItem>
+                        </ToggleGroup>
+                      </div>
                     )}
                   </div>
                   
@@ -1173,7 +1186,7 @@ export function App() {
                   )}
                   
                   {/* Results List */}
-                  <div className="mt-4 flex flex-col gap-3">
+                  <div className={`mt-4 flex-col gap-3 ${view === "map" ? "hidden lg:flex" : "flex"}`}>
                     {visibleResults.length > 0 && <PriceSummary results={visibleResults} />}
                     {visibleResults.length > 0 && (
                       <ResultsList
@@ -1251,7 +1264,7 @@ export function App() {
 
               {/* Right Column - Sticky Map */}
               {(resolved || linkText) && (
-                <div className="hidden lg:block flex-1 w-full lg:sticky lg:top-24 lg:h-[calc(100vh-8rem)]">
+                <div className={`flex-1 w-full lg:sticky lg:top-24 lg:h-[calc(100vh-8rem)] ${view === "list" ? "hidden lg:block" : "block h-[60vh] mt-2 lg:mt-0"}`}>
                   <div className="w-full h-full rounded-2xl overflow-hidden border bg-card shadow-sm relative">
                     {showMap && coords ? (
                       <ResultsMap
@@ -1437,6 +1450,14 @@ export function App() {
           </Accordion>
         </section>
       )}
+
+      {/* Version footer */}
+      {!locked && appConfig?.version && (
+        <div className="w-full text-center pb-[140px] text-[10px] text-muted-foreground/60">
+          v{appConfig.version}
+        </div>
+      )}
+
       {/* Store detail bottom sheet */}
       <Drawer
         open={!!detail}

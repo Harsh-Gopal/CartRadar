@@ -12,6 +12,7 @@ class AddressResult(BaseModel):
     short_address: str
     confidence: Literal["HIGH", "MEDIUM", "LOW", "UNKNOWN"]
     provider: str
+    pincode: str | None = None
 
 class GeocodingProvider(abc.ABC):
     @abc.abstractmethod
@@ -126,7 +127,8 @@ class NominatimProvider(GeocodingProvider):
                 formatted_address=formatted,
                 short_address=short,
                 confidence=confidence,
-                provider="nominatim"
+                provider="nominatim",
+                pincode=postcode if postcode and len(str(postcode).strip()) == 6 and str(postcode).strip().isdigit() else None
             )
             
         except Exception as e:
@@ -137,3 +139,65 @@ class NominatimProvider(GeocodingProvider):
 
     async def close(self):
         await self.client.aclose()
+
+import re
+from .platforms.base import StoreResolution
+# We can't import StoreCache directly due to circular dependencies, so we type hint it as Any or just duck-type it.
+
+class StoreAddressResolver:
+    """Service to resolve and cache store addresses and pincodes."""
+    
+    def __init__(self, geocoder: GeocodingProvider):
+        self.geocoder = geocoder
+        self.pincode_regex = re.compile(r'\b(\d{6})\b')
+        
+    def _extract_pincode(self, text: str | None) -> str | None:
+        if not text:
+            return None
+        match = self.pincode_regex.search(text)
+        return match.group(1) if match else None
+
+    async def resolve(self, res: StoreResolution, lat: float, lng: float, cache) -> None:
+        """
+        Populate res.pincode and res.city based on priority:
+        1. Provider-native pincode
+        2. Structured address extraction
+        3. Reverse geocoder fallback
+        4. Regex extraction fallback
+        """
+        # If it's a synthetic or virtual store, don't assign physical address metadata
+        if res.store_id and (res.store_id.startswith("synthetic_") or res.store_id.startswith("fm_store_")):
+            return
+
+        # Priority 1: Provider-native pincode is already on res if the provider set it
+        if res.pincode and self._extract_pincode(res.pincode):
+            res.pincode = self._extract_pincode(res.pincode)
+            # We already have a valid pincode, but we might still need the city
+            # If city is missing, we might still want to reverse geocode, but let's check cache first
+        
+        # Check if we already have it in cache
+        cached_addr = cache.get_address(lat, lng)
+        if cached_addr:
+            if not res.city:
+                res.city = cached_addr.formatted_address
+            if not res.pincode and cached_addr.pincode:
+                res.pincode = cached_addr.pincode
+                
+        # Priority 2: Extract from existing city/address if provider set it
+        if not res.pincode and res.city:
+            res.pincode = self._extract_pincode(res.city)
+            
+        # Priority 3: Reverse geocoding as fallback
+        if not res.city or not res.pincode:
+            # We need to hit Nominatim
+            addr = await self.geocoder.reverse_geocode(lat, lng)
+            if addr:
+                if not res.city:
+                    res.city = addr.formatted_address
+                if not res.pincode and addr.pincode:
+                    res.pincode = addr.pincode
+                # Priority 4: Regex extraction from formatted address ONLY as a final fallback
+                if not res.pincode:
+                    res.pincode = self._extract_pincode(addr.formatted_address)
+                    
+                cache.save_address(lat, lng, addr)

@@ -15,6 +15,7 @@ class StoreResolution:
     store_id: str | None = None
     store_name: str | None = None
     city: str | None = None
+    pincode: str | None = None
     eta_minutes: int | None = None
     # Some platforms fulfil from a secondary warehouse too
     secondary_store_id: str | None = None

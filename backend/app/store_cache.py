@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS stores (
     platform TEXT NOT NULL DEFAULT 'zepto',
     name TEXT,
     city TEXT,
+    pincode TEXT,
     lat REAL NOT NULL,
     lng REAL NOT NULL,
     probe_count INTEGER NOT NULL DEFAULT 1,
@@ -43,9 +44,27 @@ CREATE TABLE IF NOT EXISTS address_cache (
     short_address TEXT NOT NULL,
     confidence TEXT NOT NULL,
     provider TEXT NOT NULL,
+    pincode TEXT,
     resolved_at TEXT NOT NULL,
     PRIMARY KEY (lat, lng)
 );
+CREATE TABLE IF NOT EXISTS search_sweeps (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    lat REAL NOT NULL,
+    lng REAL NOT NULL,
+    radius_km REAL NOT NULL,
+    platform TEXT NOT NULL,
+    product_id TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_search_sweeps ON search_sweeps(lat, lng, radius_km, platform, product_id);
+CREATE TABLE IF NOT EXISTS search_sweep_stores (
+    sweep_id INTEGER NOT NULL,
+    store_id TEXT NOT NULL,
+    platform TEXT NOT NULL,
+    FOREIGN KEY(sweep_id) REFERENCES search_sweeps(id)
+);
+CREATE INDEX IF NOT EXISTS idx_search_sweep_stores ON search_sweep_stores(sweep_id);
 """
 
 
@@ -54,6 +73,7 @@ class Store:
     id: str
     name: str | None
     city: str | None
+    pincode: str | None
     lat: float
     lng: float
     platform: str = "zepto"
@@ -66,6 +86,16 @@ class StoreCache:
         self._db = sqlite3.connect(str(path), check_same_thread=False)
         self._db.execute("PRAGMA journal_mode=WAL")
         self._db.executescript(SCHEMA)
+
+        # Migration: Add pincode columns if they don't exist
+        try:
+            self._db.execute("ALTER TABLE stores ADD COLUMN pincode TEXT;")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            self._db.execute("ALTER TABLE address_cache ADD COLUMN pincode TEXT;")
+        except sqlite3.OperationalError:
+            pass
 
         # Heal any coordinates corrupted by the old averaging bug (one-time migration)
         self._heal_corrupted_coordinates()
@@ -98,16 +128,28 @@ class StoreCache:
     def stores_within(self, lat: float, lng: float, radius_km: float, platform: str = "zepto") -> list[Store]:
         dlat = radius_km / KM_PER_DEG_LAT
         dlng = radius_km / (KM_PER_DEG_LAT * max(0.1, math.cos(math.radians(lat))))
-        rows = self._db.execute(
-            "SELECT id, name, city, lat, lng, platform FROM stores "
-            "WHERE platform = ? AND lat BETWEEN ? AND ? AND lng BETWEEN ? AND ?",
+        
+        # 1. Find all stores discovered by probe points within this exact radius
+        probes = self._db.execute(
+            "SELECT lat, lng, store_id FROM probed_points "
+            "WHERE platform = ? AND lat BETWEEN ? AND ? AND lng BETWEEN ? AND ? AND store_id IS NOT NULL",
             (platform, lat - dlat, lat + dlat, lng - dlng, lng + dlng),
         ).fetchall()
-        return [
-            Store(*r)
-            for r in rows
-            if haversine_km(lat, lng, r[3], r[4]) <= radius_km
-        ]
+        
+        valid_store_ids = {
+            p[2] for p in probes
+            if haversine_km(lat, lng, p[0], p[1]) <= radius_km
+        }
+        
+        if not valid_store_ids:
+            return []
+            
+        # 2. Fetch the actual Store objects
+        placeholders = ",".join("?" * len(valid_store_ids))
+        query = f"SELECT id, name, city, pincode, lat, lng, platform FROM stores WHERE platform = ? AND id IN ({placeholders})"
+        
+        rows = self._db.execute(query, [platform] + list(valid_store_ids)).fetchall()
+        return [Store(*r) for r in rows]
 
     def has_fresh_probe_near(self, lat: float, lng: float, within_km: float, platform: str = "zepto") -> bool:
         cutoff_ok = datetime.now(timezone.utc) - timedelta(days=SERVICEABLE_PROBE_TTL_DAYS)
@@ -129,37 +171,38 @@ class StoreCache:
 
     def _upsert_store(
         self, lat: float, lng: float, store_id: str, store_name: str | None,
-        city: str | None, now: str, platform: str = "zepto"
+        city: str | None, pincode: str | None, now: str, platform: str = "zepto"
     ) -> Store:
         row = self._db.execute(
-            "SELECT lat, lng, probe_count, name, city FROM stores WHERE id = ? AND platform = ?",
+            "SELECT lat, lng, probe_count, name, city, pincode FROM stores WHERE id = ? AND platform = ?",
             (store_id, platform),
         ).fetchone()
         if row:
-            olat, olng, n, r_name, r_city = row
+            olat, olng, n, r_name, r_city, r_pincode = row
             # Do NOT average new coordinates into the existing store location.
             # The first-discovered coordinate is authoritative — averaging causes
             # the store to "drift" outwards as the search radius expands, pushing
             # it outside the user's requested radius filter.
             final_name = store_name or r_name
             final_city = city or r_city
+            final_pincode = pincode or r_pincode
             self._db.execute(
                 "UPDATE stores SET probe_count=?, last_seen_at=?, "
-                "name=?, city=? WHERE id=? AND platform=?",
-                (n + 1, now, final_name, final_city, store_id, platform),
+                "name=?, city=?, pincode=? WHERE id=? AND platform=?",
+                (n + 1, now, final_name, final_city, final_pincode, store_id, platform),
             )
-            return Store(store_id, final_name, final_city, olat, olng, platform)
+            return Store(store_id, final_name, final_city, final_pincode, olat, olng, platform)
         self._db.execute(
-            "INSERT INTO stores (id, platform, name, city, lat, lng, probe_count, discovered_at, last_seen_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)",
-            (store_id, platform, store_name, city, lat, lng, now, now),
+            "INSERT INTO stores (id, platform, name, city, pincode, lat, lng, probe_count, discovered_at, last_seen_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)",
+            (store_id, platform, store_name, city, pincode, lat, lng, now, now),
         )
-        return Store(store_id, store_name, city, lat, lng, platform)
+        return Store(store_id, store_name, city, pincode, lat, lng, platform)
 
     def get_address(self, lat: float, lng: float):
         """Get a cached address for the coordinates."""
         row = self._db.execute(
-            "SELECT formatted_address, short_address, confidence, provider FROM address_cache WHERE lat = ? AND lng = ?",
+            "SELECT formatted_address, short_address, confidence, provider, pincode FROM address_cache WHERE lat = ? AND lng = ?",
             (lat, lng)
         ).fetchone()
         
@@ -169,7 +212,8 @@ class StoreCache:
                 formatted_address=row[0],
                 short_address=row[1],
                 confidence=row[2],
-                provider=row[3]
+                provider=row[3],
+                pincode=row[4]
             )
         return None
 
@@ -180,10 +224,10 @@ class StoreCache:
             self._db.execute(
                 """
                 INSERT OR REPLACE INTO address_cache 
-                (lat, lng, formatted_address, short_address, confidence, provider, resolved_at) 
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                (lat, lng, formatted_address, short_address, confidence, provider, pincode, resolved_at) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (lat, lng, result.formatted_address, result.short_address, result.confidence, result.provider, now)
+                (lat, lng, result.formatted_address, result.short_address, result.confidence, result.provider, result.pincode, now)
             )
 
     def record_probe(
@@ -193,6 +237,7 @@ class StoreCache:
         store_id: str | None,
         store_name: str | None = None,
         city: str | None = None,
+        pincode: str | None = None,
         platform: str = "zepto",
     ) -> Store | None:
         now = self._now()
@@ -201,7 +246,7 @@ class StoreCache:
             "VALUES (?, ?, ?, ?, ?, ?)",
             (lat, lng, platform, store_id, 1 if store_id else 0, now),
         )
-        store = self._upsert_store(lat, lng, store_id, store_name, city, now, platform) if store_id else None
+        store = self._upsert_store(lat, lng, store_id, store_name, city, pincode, now, platform) if store_id else None
         self._db.commit()
         return store
 
@@ -212,12 +257,13 @@ class StoreCache:
         store_id: str | None,
         store_name: str | None = None,
         city: str | None = None,
+        pincode: str | None = None,
         platform: str = "zepto",
     ) -> Store | None:
         if not store_id:
             return None
         now = self._now()
-        store = self._upsert_store(lat, lng, store_id, store_name, city, now, platform)
+        store = self._upsert_store(lat, lng, store_id, store_name, city, pincode, now, platform)
         self._db.commit()
         return store
 

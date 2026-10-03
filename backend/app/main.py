@@ -32,7 +32,7 @@ from .platforms.flipkart import FlipkartClient, FlipkartMinutesClient
 from .ratelimit import ConcurrencyGate, RateLimiter, TokenBucket
 from .search import run_search
 from .store_cache import StoreCache
-from .geocoder import NominatimProvider
+from .geocoder import NominatimProvider, StoreAddressResolver
 from .watches.db import WatchDB
 from .watches.router import router as watches_router
 from .watches import scheduler as watches_scheduler
@@ -74,6 +74,7 @@ async def lifespan(app: FastAPI):
     app.state.clients = _create_clients()
     app.state.cache = StoreCache(config.DATABASE_PATH)
     app.state.geocoder = NominatimProvider()
+    app.state.address_resolver = StoreAddressResolver(app.state.geocoder)
     app.state.limiter = RateLimiter(
         request_capacity=config.REQUEST_BURST,
         request_refill_per_sec=config.REQUESTS_PER_MIN / 60,
@@ -246,6 +247,7 @@ async def public_config(_: None = Depends(require_rate)):
         "auth_required": config.APP_TOKEN is not None,
         "max_radius_km": config.MAX_RADIUS_KM,
         "enabled_platforms": config.ENABLED_PLATFORMS,
+        "version": config.APP_VERSION,
     }
 
 
@@ -474,6 +476,7 @@ async def search(
             async for event in run_search(
                 client, state.cache, pvid, lat, lng, radius_km, force,
                 probe_budget=None if (config.DEV_MODE or _local_requests_are_unmetered(request)) else state.probe_budget,
+                address_resolver=state.address_resolver
             ):
                 yield f"data: {json.dumps(event)}\n\n"
         finally:

@@ -42,6 +42,7 @@ export interface HomeResult {
   serviceable: boolean
   store_name: string | null
   city: string | null
+  pincode: string | null
   eta_minutes: number | null
   product: ProductInfo | null
   platform?: string
@@ -52,6 +53,7 @@ export interface StoreResult {
     id: string
     name: string | null
     city: string | null
+    pincode: string | null
     lat: number
     lng: number
     platform?: string
@@ -77,6 +79,7 @@ export interface AppConfig {
   auth_required: boolean
   max_radius_km: number
   enabled_platforms: string[]
+  version: string
 }
 
 export interface PlatformInfo {

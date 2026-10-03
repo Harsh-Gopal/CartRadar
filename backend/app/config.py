@@ -1,6 +1,8 @@
 import os
 from pathlib import Path
 
+APP_VERSION = "0.24.1"
+
 
 def _flag(name: str, default: bool) -> bool:
     return os.environ.get(name, str(default)).strip().lower() in ("1", "true", "yes", "on")

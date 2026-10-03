@@ -27,6 +27,7 @@ async def run_search(
     radius_km: float,
     force: bool = False,
     probe_budget: TokenBucket | None = None,
+    address_resolver = None,
 ) -> AsyncIterator[dict]:
     """Run a stock check search using any PlatformClient.
 
@@ -102,13 +103,19 @@ async def run_search(
                     import time
                     res.store_id = f"fm_store_{int(time.time())}_{round(plat, 3)}_{round(plng, 3)}"
 
-        store = cache.record_probe(plat, plng, res.store_id, res.store_name, res.city, platform)
-        if store:
-            start_check(store)
-        if res.secondary_store_id:
-            secondary = cache.record_store(plat, plng, res.secondary_store_id, platform=platform)
-            if secondary:
-                start_check(secondary)
+        if address_resolver:
+            await address_resolver.resolve(res, plat, plng, cache)
+        
+        try:
+            store = cache.record_probe(plat, plng, res.store_id, res.store_name, res.city, res.pincode, platform)
+            if store:
+                start_check(store)
+            if res.secondary_store_id:
+                secondary = cache.record_store(plat, plng, res.secondary_store_id, platform=platform)
+                if secondary:
+                    start_check(secondary)
+        except Exception as e:
+            log.error("Failed to record probe for store %s (platform: %s, lat/lng: %s/%s): %s", res.store_id, platform, plat, plng, e)
 
     async def main_flow() -> None:
         try:
@@ -148,7 +155,10 @@ async def run_search(
                     home.store_id = f"fm_store_{int(time.time())}_{round(lat, 3)}_{round(lng, 3)}"
 
             checked.add(home.store_id)
-            home_store = cache.record_probe(lat, lng, home.store_id, home.store_name, home.city, platform)
+            if address_resolver:
+                await address_resolver.resolve(home, lat, lng, cache)
+                            
+            home_store = cache.record_probe(lat, lng, home.store_id, home.store_name, home.city, home.pincode, platform)
             home_product = await client.product_at_store(product_id, home.store_id, lat=lat, lng=lng)
             if home.secondary_store_id and (
                 home_product is None or home_product.status != "in_stock"
@@ -165,6 +175,7 @@ async def run_search(
                 "type": "home_result",
                 "serviceable": home.serviceable,
                 "city": home.city,
+                "pincode": home.pincode,
                 "store_name": home.store_name,
                 "eta_minutes": home_eta,
                 "product": asdict(home_product) if home_product else None,
@@ -181,6 +192,7 @@ async def run_search(
                 id=home.store_id,
                 name=home.store_name,
                 city=home.city,
+                pincode=home.pincode,
                 lat=home_store.lat,
                 lng=home_store.lng,
                 platform=platform,
@@ -257,6 +269,7 @@ async def run_search(
                     "type": "home_result",
                     "serviceable": status != "not_carried",
                     "city": None,
+                    "pincode": None,
                     "store_name": f"{client.display_name} (your location)",
                     "eta_minutes": None,
                     "product": asdict(result),
@@ -269,6 +282,7 @@ async def run_search(
                     "type": "home_result",
                     "serviceable": False,
                     "city": None,
+                    "pincode": None,
                     "store_name": None,
                     "eta_minutes": None,
                     "product": None,
