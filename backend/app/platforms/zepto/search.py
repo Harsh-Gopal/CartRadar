@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from dataclasses import asdict
 from typing import AsyncIterator
 
 from .client import ZeptoClient, ZeptoPlaywrightSession, ZeptoWafBlockedError, ZeptoNetworkError
@@ -59,14 +60,7 @@ async def run_zepto_search(
                             
                             yield {
                                 "type": "store_result",
-                                "store": {
-                                    "id": store_obj.id,
-                                    "name": store_obj.name,
-                                    "city": store_obj.city,
-                                    "lat": store_obj.lat,
-                                    "lng": store_obj.lng,
-                                    "platform": "zepto"
-                                },
+                                "store": asdict(store_obj),
                                 "distance_km": dist,
                                 "status": status,
                                 "price": prod.price,
@@ -104,14 +98,7 @@ async def run_zepto_search(
                     
                     yield {
                         "type": "store_result",
-                        "store": {
-                            "id": c_store.id,
-                            "name": c_store.name,
-                            "city": c_store.city,
-                            "lat": c_store.lat,
-                            "lng": c_store.lng,
-                            "platform": "zepto"
-                        },
+                        "store": asdict(c_store),
                         "distance_km": dist,
                         "status": status,
                         "price": prod.price,
@@ -177,14 +164,7 @@ async def run_zepto_search(
                                 
                                 yield {
                                     "type": "store_result",
-                                    "store": {
-                                        "id": new_store.id,
-                                        "name": new_store.name,
-                                        "city": new_store.city,
-                                        "lat": new_store.lat,
-                                        "lng": new_store.lng,
-                                        "platform": "zepto"
-                                    },
+                                    "store": asdict(new_store),
                                     "distance_km": dist,
                                     "status": status,
                                     "price": prod.price,

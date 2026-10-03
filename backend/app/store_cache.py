@@ -78,6 +78,13 @@ class Store:
     lng: float
     platform: str = "zepto"
 
+    def __post_init__(self):
+        if not self.pincode and self.city:
+            import re
+            match = re.search(r'\b(\d{6})\b', self.city)
+            if match:
+                self.pincode = match.group(1)
+
 
 class StoreCache:
     def __init__(self, path: Path | str):

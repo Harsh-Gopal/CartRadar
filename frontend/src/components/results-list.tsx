@@ -94,7 +94,7 @@ function StoreListItem({
   // Keep it in the API -> frontend Store model -> result-card flow.
   // Main store cards must display pincode when available.
   // Do NOT replace this with regex extraction from `city`.
-  const displayPincode = r.store.pincode || null
+  const displayPincode = r.store.pincode || r.store.city?.match(/\b\d{6}\b/)?.[0] || null
 
   // Clean the city string for graceful fallback (removes random trailing commas).
   // This is only used if displayPincode is null.
