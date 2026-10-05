@@ -19,6 +19,7 @@ async def run_zepto_search(
     radius_km: float,
     cache: StoreCache,
     force: bool = False,
+    address_resolver=None,
 ) -> AsyncIterator[dict]:
     """Hex-grid search orchestrator for Zepto using a single Playwright session."""
     
@@ -40,9 +41,13 @@ async def run_zepto_search(
             home_product = None
             if home_res and home_res.get("serviceable") and home_res.get("all_store_ids"):
                 for s_id in home_res["all_store_ids"]:
-                    cache.record_probe(lat, lng, s_id, home_res.get("store_name"), home_res.get("city"), "zepto")
+                    cache.record_probe(lat, lng, s_id, home_res.get("store_name"), home_res.get("city"), platform="zepto")
                     store_obj = cache.record_store(lat, lng, s_id, platform="zepto")
                     
+                    if store_obj and not (store_obj.city and store_obj.pincode) and address_resolver:
+                        await address_resolver.resolve_for_store(store_obj, cache)
+                        cache.update_store_address(store_obj.id, "zepto", store_obj.city, store_obj.pincode)
+
                     if store_obj and store_obj.id not in checked_stores:
                         checked_stores.add(store_obj.id)
                         try:
@@ -70,7 +75,7 @@ async def run_zepto_search(
                         except Exception as e:
                             log.warning(f"Zepto product fetch failed for store {store_obj.id}: {e}")
             else:
-                cache.record_probe(lat, lng, None, None, None, "zepto")
+                cache.record_probe(lat, lng, None, None, None, None, platform="zepto")
                 
             yield {
                 "type": "home_result",
@@ -150,7 +155,11 @@ async def run_zepto_search(
                 
                 if res and res.get("serviceable") and res.get("all_store_ids"):
                     for s_id in res["all_store_ids"]:
-                        new_store = cache.record_probe(p_lat, p_lng, s_id, res.get("store_name"), res.get("city"), "zepto")
+                        new_store = cache.record_probe(p_lat, p_lng, s_id, res.get("store_name"), res.get("city"), platform="zepto")
+                        if new_store and not (new_store.city and new_store.pincode) and address_resolver:
+                            await address_resolver.resolve_for_store(new_store, cache)
+                            cache.update_store_address(new_store.id, "zepto", new_store.city, new_store.pincode)
+                            
                         if new_store and new_store.id not in checked_stores:
                             checked_stores.add(new_store.id)
                             counts["stores"] += 1
@@ -174,7 +183,7 @@ async def run_zepto_search(
                             except Exception as e:
                                 log.warning(f"Zepto product fetch failed for discovered store {new_store.id}: {e}")
                 else:
-                    cache.record_probe(p_lat, p_lng, None, None, None, "zepto")
+                    cache.record_probe(p_lat, p_lng, None, None, None, None, platform="zepto")
 
             yield {"type": "checking", "total_stores": counts["stores"]}
             yield {"type": "done", "summary": dict(counts)}

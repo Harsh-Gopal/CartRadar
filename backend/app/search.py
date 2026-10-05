@@ -39,7 +39,7 @@ async def run_search(
     """
     if client.platform_name == "zepto":
         from .platforms.zepto import run_zepto_search
-        async for event in run_zepto_search(client, product_id, lat, lng, radius_km, cache, force):
+        async for event in run_zepto_search(client, product_id, lat, lng, radius_km, cache, force, address_resolver):
             yield event
         return
 
@@ -107,7 +107,7 @@ async def run_search(
             # We don't resolve address via probe coordinates anymore. Just record the probe.
             # Record probe handles None store_ids properly too
             store = None
-            if res.store_id and not res.store_id.startswith("synthetic_"):
+            if res.store_id and not res.store_id.startswith("synthetic_") and not res.store_id.startswith("fm_store_"):
                 store = cache.record_probe(plat, plng, res.store_id, res.store_name, res.city, res.pincode, platform)
                 # Resolve address using STORE coordinates (not probe grid point)
                 if store and not (store.city and store.pincode) and address_resolver:
@@ -120,7 +120,7 @@ async def run_search(
             else:
                 cache.record_probe(plat, plng, None, None, None, None, platform)
                 
-            if res.secondary_store_id and not res.secondary_store_id.startswith("synthetic_"):
+            if res.secondary_store_id and not res.secondary_store_id.startswith("synthetic_") and not res.secondary_store_id.startswith("fm_store_"):
                 secondary = cache.record_store(plat, plng, res.secondary_store_id, platform=platform)
                 if secondary:
                     start_check(secondary)

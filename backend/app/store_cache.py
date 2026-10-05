@@ -145,10 +145,10 @@ class StoreCache:
     def _clean_synthetic_stores(self) -> None:
         """Remove synthetic Swiggy stores that were incorrectly persisted."""
         self._db.execute(
-            "DELETE FROM stores WHERE id LIKE 'synthetic_%'"
+            "DELETE FROM stores WHERE id LIKE 'synthetic_%' OR id LIKE 'fm_store_%'"
         )
         self._db.execute(
-            "UPDATE probed_points SET store_id=NULL, serviceable=0 WHERE store_id LIKE 'synthetic_%'"
+            "UPDATE probed_points SET store_id=NULL, serviceable=0 WHERE store_id LIKE 'synthetic_%' OR store_id LIKE 'fm_store_%'"
         )
         self._db.commit()
 
