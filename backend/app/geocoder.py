@@ -201,3 +201,36 @@ class StoreAddressResolver:
                     res.pincode = self._extract_pincode(addr.formatted_address)
                     
                 cache.save_address(lat, lng, addr)
+
+    async def resolve_for_store(self, store, cache) -> None:
+        """Resolve city and pincode using the STORE's own coordinates (not probe coords).
+        
+        IMPORTANT: This method geocodes store.lat / store.lng — the warehouse's actual
+        physical coordinates — not the hex-grid probe point. This is the canonical
+        source of pincode and location for the Store contract.
+        """
+        if store.id.startswith("synthetic_") or store.id.startswith("fm_store_"):
+            return
+        if store.city and store.pincode:
+            return  # already resolved
+        
+        # Check address cache using STORE coordinates
+        cached = cache.get_address(store.lat, store.lng)
+        if cached:
+            if not store.city:
+                store.city = cached.formatted_address
+            if not store.pincode and cached.pincode:
+                store.pincode = cached.pincode
+            if store.city and store.pincode:
+                return
+        
+        # Fetch from Nominatim
+        addr = await self.geocoder.reverse_geocode(store.lat, store.lng)
+        if addr:
+            if not store.city:
+                store.city = addr.formatted_address
+            if not store.pincode and addr.pincode:
+                store.pincode = addr.pincode
+            if not store.pincode:
+                store.pincode = self._extract_pincode(addr.formatted_address)
+            cache.save_address(store.lat, store.lng, addr)

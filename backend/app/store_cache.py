@@ -68,6 +68,20 @@ CREATE INDEX IF NOT EXISTS idx_search_sweep_stores ON search_sweep_stores(sweep_
 """
 
 
+# IMPORTANT: Store is the canonical warehouse identity and location contract.
+# ALL fields must be preserved through every transformation, cache read, API
+# serialization, and frontend rendering layer.
+#
+# Required fields:
+#   id       - platform-specific warehouse identifier (e.g. Swiggy store ID "1400979")
+#   platform - e.g. "swiggy", "zepto", "blinkit"
+#   lat/lng  - warehouse physical coordinates (NOT search/probe coordinates)
+#   pincode  - warehouse postal code derived from lat/lng via reverse geocoding
+#              (NOT from the search pincode, NOT from probe grid point geocoding)
+#   city     - human-readable location name from lat/lng reverse geocoding
+#
+# Synthetic/virtual store IDs (prefix: "synthetic_", "fm_store_") must NOT
+# receive physical address metadata (city, pincode) and must NOT be persisted.
 @dataclass
 class Store:
     id: str
@@ -106,6 +120,9 @@ class StoreCache:
 
         # Heal any coordinates corrupted by the old averaging bug (one-time migration)
         self._heal_corrupted_coordinates()
+        self._clean_synthetic_stores()
+        self._heal_address_cache_pincodes()
+        self._heal_wrong_store_pincodes()
 
     def _heal_corrupted_coordinates(self) -> None:
         """Fixes store coordinates that were pushed outwards by the old averaging logic.
@@ -122,6 +139,57 @@ class StoreCache:
                     self._db.execute(
                         "UPDATE stores SET lat = ?, lng = ? WHERE id = ? AND platform = ?",
                         (plat_lat, plat_lng, sid, plat)
+                    )
+        self._db.commit()
+
+    def _clean_synthetic_stores(self) -> None:
+        """Remove synthetic Swiggy stores that were incorrectly persisted."""
+        self._db.execute(
+            "DELETE FROM stores WHERE id LIKE 'synthetic_%'"
+        )
+        self._db.execute(
+            "UPDATE probed_points SET store_id=NULL, serviceable=0 WHERE store_id LIKE 'synthetic_%'"
+        )
+        self._db.commit()
+
+    def _heal_address_cache_pincodes(self) -> None:
+        """Populate pincode from formatted_address for rows where pincode is NULL."""
+        import re
+        pattern = re.compile(r'\b(\d{6})\b')
+        rows = self._db.execute(
+            "SELECT lat, lng, formatted_address FROM address_cache WHERE pincode IS NULL"
+        ).fetchall()
+        updated = 0
+        for lat, lng, formatted in rows:
+            m = pattern.search(formatted or "")
+            if m:
+                self._db.execute(
+                    "UPDATE address_cache SET pincode=? WHERE lat=? AND lng=?",
+                    (m.group(1), lat, lng)
+                )
+                updated += 1
+        if updated:
+            self._db.commit()
+
+    def _heal_wrong_store_pincodes(self) -> None:
+        """Clear city/pincode for stores where the stored city does not match
+        the address_cache for the store's own coordinates. These were set from
+        probe-point geocoding instead of store-coordinate geocoding."""
+        rows = self._db.execute(
+            "SELECT id, platform, lat, lng, city, pincode FROM stores WHERE city IS NOT NULL"
+        ).fetchall()
+        for store_id, platform, lat, lng, stored_city, stored_pincode in rows:
+            # Check if address_cache has an entry for these store coordinates
+            cached = self._db.execute(
+                "SELECT formatted_address, pincode FROM address_cache WHERE lat=? AND lng=?",
+                (lat, lng)
+            ).fetchone()
+            if cached:
+                cached_addr, cached_pin = cached
+                if cached_addr and cached_addr != stored_city:
+                    self._db.execute(
+                        "UPDATE stores SET city=?, pincode=? WHERE id=? AND platform=?",
+                        (cached_addr, cached_pin, store_id, platform)
                     )
         self._db.commit()
 
@@ -273,6 +341,14 @@ class StoreCache:
         store = self._upsert_store(lat, lng, store_id, store_name, city, pincode, now, platform)
         self._db.commit()
         return store
+
+    def update_store_address(self, store_id: str, platform: str, city: str | None, pincode: str | None) -> None:
+        """Update city and pincode for an existing store record."""
+        self._db.execute(
+            "UPDATE stores SET city=COALESCE(?, city), pincode=COALESCE(?, pincode) WHERE id=? AND platform=?",
+            (city, pincode, store_id, platform)
+        )
+        self._db.commit()
 
     def stats(self) -> dict:
         stores = self._db.execute("SELECT COUNT(*) FROM stores").fetchone()[0]

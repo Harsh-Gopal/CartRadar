@@ -103,14 +103,24 @@ async def run_search(
                     import time
                     res.store_id = f"fm_store_{int(time.time())}_{round(plat, 3)}_{round(plng, 3)}"
 
-        if address_resolver:
-            await address_resolver.resolve(res, plat, plng, cache)
-        
         try:
-            store = cache.record_probe(plat, plng, res.store_id, res.store_name, res.city, res.pincode, platform)
-            if store:
-                start_check(store)
-            if res.secondary_store_id:
+            # We don't resolve address via probe coordinates anymore. Just record the probe.
+            # Record probe handles None store_ids properly too
+            store = None
+            if res.store_id and not res.store_id.startswith("synthetic_"):
+                store = cache.record_probe(plat, plng, res.store_id, res.store_name, res.city, res.pincode, platform)
+                # Resolve address using STORE coordinates (not probe grid point)
+                if store and not (store.city and store.pincode) and address_resolver:
+                    await address_resolver.resolve_for_store(store, cache)
+                    # Update the store record with resolved city/pincode
+                    cache.update_store_address(store.id, platform, store.city, store.pincode)
+
+                if store:
+                    start_check(store)
+            else:
+                cache.record_probe(plat, plng, None, None, None, None, platform)
+                
+            if res.secondary_store_id and not res.secondary_store_id.startswith("synthetic_"):
                 secondary = cache.record_store(plat, plng, res.secondary_store_id, platform=platform)
                 if secondary:
                     start_check(secondary)
@@ -155,10 +165,17 @@ async def run_search(
                     home.store_id = f"fm_store_{int(time.time())}_{round(lat, 3)}_{round(lng, 3)}"
 
             checked.add(home.store_id)
-            if address_resolver:
-                await address_resolver.resolve(home, lat, lng, cache)
-                            
+            
             home_store = cache.record_probe(lat, lng, home.store_id, home.store_name, home.city, home.pincode, platform)
+            
+            if home_store and not (home_store.city and home_store.pincode) and address_resolver:
+                await address_resolver.resolve_for_store(home_store, cache)
+                cache.update_store_address(home_store.id, platform, home_store.city, home_store.pincode)
+                
+                # Make sure the home StoreResolution has updated city/pincode for the home_result event
+                home.city = home_store.city
+                home.pincode = home_store.pincode
+                
             home_product = await client.product_at_store(product_id, home.store_id, lat=lat, lng=lng)
             if home.secondary_store_id and (
                 home_product is None or home_product.status != "in_stock"

@@ -369,9 +369,13 @@ class SwiggyClient(PlatformClient):
         # a single "synthetic" store, preventing 91 fake stores on the map while
         # still allowing the sweep to complete and return "Not Carried".
         if not store_id:
-            grid_lat = round(lat / 0.04) * 0.04
-            grid_lng = round(lng / 0.04) * 0.04
-            store_id = f"synthetic_{grid_lat:.2f}_{grid_lng:.2f}"
+            return StoreResolution(
+                serviceable=False,
+                store_id=None,
+                store_name=None,
+                eta_minutes=None,
+                city=None,
+            )
 
         # Build a human-readable store name from ETA
         store_label = f"Instamart ({eta} min)" if eta else "Instamart"
